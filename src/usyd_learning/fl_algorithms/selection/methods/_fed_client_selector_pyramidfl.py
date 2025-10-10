@@ -24,7 +24,7 @@ class FedClientSelector_PyramidFL(FedClientSelector):
             
         # Convert to list of (client_id, data_pack) and sort by avg_loss descending
         sorted_clients = sorted(self._clients_data_dict.items(),
-                              key = lambda item: item[1]["train_record"]["sqrt_train_loss_power_two_sum"],
+                              key = lambda item: item[1]["train_record"]["pyramidfl_statistical_utility"],
                               reverse = True)
 
         # Take top-k
