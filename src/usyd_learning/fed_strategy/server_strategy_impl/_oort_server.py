@@ -14,12 +14,12 @@ class OortServerStrategy(ServerStrategy):
     def __init__(self, args, server_node) -> None:
         super().__init__()
         self._args = args
-        self._strategy_type = "fedavg"
+        self._strategy_type = "oort"
         self._obj = server_node
 
     def _create_inner(self, args, server_node) -> None:
         self._args = args
-        self._strategy_type = "fedavg"
+        self._strategy_type = "oort"
         self._obj = server_node
         return self
 

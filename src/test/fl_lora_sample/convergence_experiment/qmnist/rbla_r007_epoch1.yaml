@@ -15,9 +15,11 @@ yaml_folder_training_logger_path: ../../yamls/training_logger/
 yaml_folder_training_path: ../../yamls/training/
 yaml_folder_general_path: ../../yamls/general
 yaml_folder_rank_distribution_path: ../../yamls/rank_distribution
+
 yaml_folder_aggreation_files:
 - aggregation_rbla.yaml: aggregation_rbla
 - aggregation_sp.yaml: aggregation_sp
+
 yaml_folder_client_selection_files:
 - random.yaml: client_selection_random
 yaml_folder_dataset_loader_files:
@@ -77,6 +79,7 @@ yaml_folder_rank_distribution_files:
 - rank005.yaml: rank_distribution_005_homogeneous
 - rank006.yaml: rank_distribution_006_homogeneous
 - rank007.yaml: rank_distribution_007_homogeneous
+
 yaml_combination:
   runner:
   - general_round300
