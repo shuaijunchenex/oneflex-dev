@@ -109,12 +109,12 @@ def run_all(configs):
 
 if __name__ == "__main__":
     configs = [
-        "./fl_lora_sample/script_test-sp.yaml",
-        "./fl_lora_sample/script_test-rbla.yaml",
+        "./fl_lora_sample/convergence_experiment/double_imbalance/sp_epoch1.yaml",
+        "./fl_lora_sample/convergence_experiment/double_imbalance/rbla_epoch1.yaml",
     ]
-    config_list = list_yaml_files("/Users/chensj/Documents/GitHub/usyd-learning-src/src/test/fl_lora_sample/convergence_experiment/additional_kmnist", 
-                                  "/Users/chensj/Documents/GitHub/usyd-learning-src/src/test/fl_lora_sample/convergence_experiment/additional_kmnist")
-    run_all(config_list)
+    config_list = list_yaml_files("./fl_lora_sample/convergence_experiment/double_imbalance", 
+                                  "./fl_lora_sample/convergence_experiment/double_imbalance")
+    run_all(configs)
 
 
 # if __name__ == "__main__":

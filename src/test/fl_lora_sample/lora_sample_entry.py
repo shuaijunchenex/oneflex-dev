@@ -2,12 +2,15 @@
 Entry class of lora sample
 """
 
+import copy
+
 from usyd_learning.fed_node import FedNodeVars, FedNodeEventArgs
 from usyd_learning.fed_runner import FedRunner
 from usyd_learning.ml_utils import AppEntry, console
 from usyd_learning.fl_algorithms.noniid.noniid_data_generator import NoniidDataGenerator
 from usyd_learning.ml_data_loader.dataset_loader_factory import DatasetLoaderFactory
 from usyd_learning.ml_data_loader.dataset_loader_args import DatasetLoaderArgs
+
 
 
 class SampleAppEntry(AppEntry):
@@ -74,8 +77,9 @@ class SampleAppEntry(AppEntry):
         # Prepare each client node and var
         client_var_list = []
         for index, node in enumerate(self.fed_runner.client_node_list):
-            client_var = FedNodeVars(self.client_yaml)
+            client_var = FedNodeVars(self.client_yaml, is_clone_dict=True)
             client_var.config_dict["nn_model"]["rank_ratio"] = self.server_yaml["rank_distribution"]["rank_ratio_list"][index]
+            client_var.config_dict["nn_model"]["share_model"] = False  # 禁用模型共享
             client_var.prepare()
             client_var.data_loader = allocated_noniid_data[index]
             client_var.data_sample_num = client_var.data_loader.data_sample_num
