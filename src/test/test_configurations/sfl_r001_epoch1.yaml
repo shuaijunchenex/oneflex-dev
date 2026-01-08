@@ -1,0 +1,99 @@
+yaml_folder_aggreation_path: ../fl_lora_sample/yamls/aggregation/
+yaml_folder_client_selection_path: ../fl_lora_sample/yamls/client_selection/
+yaml_folder_dataset_loader_path: ../fl_lora_sample/yamls/dataset_loader/
+yaml_folder_data_distribution_path: ../fl_lora_sample/yamls/data_distribution/
+yaml_folder_loss_func_path: ../fl_lora_sample/yamls/loss_func/
+yaml_folder_nn_model_path: ../fl_lora_sample/yamls/nn_model/
+yaml_folder_fl_nodes_path: ../fl_lora_sample/yamls/fl_nodes/
+yaml_folder_optimizer_path: ../fl_lora_sample/yamls/optimizer/
+yaml_folder_client_strategy_path: ../fl_lora_sample/yamls/client_strategy/
+yaml_folder_server_strategy_path: ../fl_lora_sample/yamls/server_strategy/
+yaml_folder_runner_strategy_path: ../fl_lora_sample/yamls/runner_strategy/
+yaml_folder_trainer_path: ../fl_lora_sample/yamls/trainer/
+yaml_folder_training_logger_path: ../fl_lora_sample/yamls/training_logger/
+yaml_folder_training_path: ../fl_lora_sample/yamls/training/
+yaml_folder_general_path: ../fl_lora_sample/yamls/general
+yaml_folder_rank_distribution_path: ""
+
+yaml_folder_aggreation_files:
+- aggregation_sflavg.yaml: aggregation_sflavg
+
+yaml_folder_client_selection_files:
+- random.yaml: client_selection_random
+
+yaml_folder_dataset_loader_files:
+- kmnist.yaml: dataset_loader_kmnist
+- mnist.yaml: dataset_loader_mnist
+
+yaml_folder_data_distribution_files:
+- kmnist_one_label.yaml: kmnist_one_label
+- mnist_one_label.yaml: mnist_one_label
+
+yaml_folder_loss_func_files:
+- cross_entropy.yaml: cross_entropy
+
+yaml_folder_nn_model_files:
+- nn_model_sfl_client.yaml: nn_model_sfl_client
+- nn_model_sfl_server.yaml: nn_model_sfl_server
+
+yaml_folder_fl_nodes_files:
+- default_10_clients.yaml: fl_nodes
+
+yaml_folder_optimizer_files:
+- sgd.yaml: sgd
+
+yaml_folder_training_files:
+- training_epoch1.yaml: training_epoch1
+
+yaml_folder_client_strategy_files:
+- sfl.yaml: sfl_client_strategy
+
+yaml_folder_server_strategy_files:
+- sfl.yaml: sfl_server_strategy
+
+yaml_folder_runner_strategy_files:
+- sfl.yaml: sfl_runner_strategy
+
+yaml_folder_trainer_files:
+- standard_trainer.yaml: trainer_standard
+- sl_client_trainer.yaml: trainer_sl_client
+- sl_server_trainer.yaml: trainer_sl_server
+
+yaml_folder_training_logger_files:
+- standard_training_logger.yaml: training_logger
+
+yaml_folder_general_files:
+- general_round30.yaml: general_round30
+
+yaml_folder_rank_distribution_files: []
+
+yaml_combination:
+  runner:
+  - general_round30
+  - training_logger
+  - fl_nodes
+  - sfl_runner_strategy
+  client_yaml:
+  - general_round30
+  - training_logger
+  - dataset_loader_mnist
+  - nn_model_sfl_client
+  - cross_entropy
+  - sgd
+  - training_epoch1
+  - mnist_one_label
+  - sfl_client_strategy
+  - trainer_sl_client
+  server_yaml:
+  - general_round30
+  - training_logger
+  - dataset_loader_mnist
+  - nn_model_sfl_server
+  - cross_entropy
+  - sgd
+  - training_epoch1
+  - mnist_one_label
+  - trainer_sl_server
+  - client_selection_random
+  - sfl_server_strategy
+  - aggregation_sflavg

@@ -49,6 +49,9 @@ class StrategyFactory:
             case "sp":
                 from usyd_learning.fed_strategy.runner_strategy_impl._sp_runner_strategy import SpRunnerStrategy
                 return SpRunnerStrategy(runner, runner_strategy_args, client_nodes, server_node)
+            case "sfl":
+                from usyd_learning.sfl_strategy.runner_strategy_impl._sfl_runner_example import SflRunnerStrategy
+                return SflRunnerStrategy(runner, runner_strategy_args, client_nodes, server_node)
 
         raise ValueError(f"Runner strategy type '{runner_strategy_args.strategy_name}' not support.")
 
@@ -67,6 +70,9 @@ class StrategyFactory:
             case "sp":
                 from usyd_learning.fed_strategy.client_strategy_impl._sp_client import SpClientTrainingStrategy
                 return SpClientTrainingStrategy(client_strategy_args, client_node_input)
+            case "sfl":
+                from usyd_learning.sfl_strategy.client_strategy_impl._sfl_client_example import SflClientStrategy
+                return SflClientStrategy(client_strategy_args, client_node_input)
 
         raise ValueError(f"Client strategy type '{client_strategy_args.strategy_name}' not support.")
 
@@ -85,5 +91,8 @@ class StrategyFactory:
             case "sp":
                 from usyd_learning.fed_strategy.server_strategy_impl._sp_server import SpServerStrategy
                 return SpServerStrategy(server_strategy_args, serve_node_input)
+            case "sfl":
+                from usyd_learning.sfl_strategy.server_strategy_impl._sfl_server_example import SflServerStrategy
+                return SflServerStrategy(server_strategy_args, serve_node_input)
 
         raise ValueError(f"Server strategy type '{server_strategy_args.strategy_name}' not support.")

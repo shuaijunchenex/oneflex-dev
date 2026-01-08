@@ -319,7 +319,8 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
 
         # build trainer
         trainer_args = ModelTrainerFactory.create_args(self.config_dict["trainer"])
-        trainer_args.set_trainer_args(self.model, self.optimizer, self.loss_func, self.data_loader, 'standard') #TODO: add trainer type to config
+        trainer_type = self.config_dict.get("trainer", {}).get("trainer_type", trainer_args.trainer_type)
+        trainer_args.set_trainer_args(self.model, self.optimizer, self.loss_func, self.data_loader, trainer_type)
         self.trainer = ModelTrainerFactory.create(trainer_args)
 
         self.raise_event("on_prepare_trainer", args)

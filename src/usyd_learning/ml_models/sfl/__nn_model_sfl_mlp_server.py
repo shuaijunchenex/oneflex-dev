@@ -20,11 +20,6 @@ class NNModel_SflMlpServer(NNModel):
     def create_model(self, args: NNModelArgs) -> AbstractNNModel:
         super().create_model(args)
 
-        hidden_dim = args.hidden_dim or args.get("hidden_dim", 0) or 200
-        server_hidden_dim = args.get("server_hidden_dim", hidden_dim) or hidden_dim
-        output_dim = args.output_dim or args.get("output_dim", 0) or 10
-        self._softmax_dim = args.softmax_dim or args.get("softmax_dim", 0) or 1
-
         self._fc2 = nn.Linear(200, 200)
         self._fc3 = nn.Linear(200, 10)
         return self

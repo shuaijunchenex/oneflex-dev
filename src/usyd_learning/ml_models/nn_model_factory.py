@@ -43,5 +43,11 @@ class NNModelFactory:
             case "imdb_lora_transformer":
                 from .lora._nn_model_imdb_lora_transformer import NNModel_ImdbMSLoRATransformer
                 return NNModel_ImdbMSLoRATransformer().create_model(args)
+            case "sfl_mlp_client":
+                from .sfl.__nn_model_sfl_mlp_client import NNModel_SflMlpClient
+                return NNModel_SflMlpClient().create_model(args)
+            case "sfl_mlp_server":
+                from .sfl.__nn_model_sfl_mlp_server import NNModel_SflMlpServer
+                return NNModel_SflMlpServer().create_model(args)
 
         raise ValueError(f"Unknown mode type '{args.model_type}'")

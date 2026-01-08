@@ -29,6 +29,12 @@ class ModelTrainerFactory:
             case "imdb":
                 from .trainer._model_trainer_imdb import ModelTrainer_Imdb
                 return ModelTrainer_Imdb(args)
+            case "sl_client":
+                from .trainer._model_trainer_sl_client import ModelTrainer_SlClient
+                return ModelTrainer_SlClient(args)
+            case "sl_server":
+                from .trainer._model_trainer_sl_server import ModelTrainer_SlServer
+                return ModelTrainer_SlServer(args)
             case _:
                 raise Exception(f"Undefined trainer type {args.trainer_type}.")
 

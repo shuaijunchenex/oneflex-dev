@@ -33,11 +33,43 @@ class SflRunnerStrategy(RunnerStrategy):
             client.set_server_node(self.server_node)
 
     def simulate_client_local_training_process(self, participants: Iterable[Any]):
+        server_strategy = getattr(self.server_node, "strategy", None)
+        if server_strategy is None:
+            raise RuntimeError("SFL runner requires server strategy for forward/backward steps.")
+
         for client in participants:
             console.info(f"\n[{client.node_id}] Local training started")
-            updated_weights, train_record = client.run_local_training()
+
+            # Client forward to get smashed activations
+            forward_batches = client.strategy.run_local_forward()
+
+            activation_grads = []
+            loss_sum = 0.0
+            metric_acc = {}
+
+            for smashed_data, labels in forward_batches:
+                server_input, loss, metrics = server_strategy.run_server_forward(smashed_data, labels, training=True)
+                act_grad, loss_value = server_strategy.run_server_backward(server_input, loss, training=True)
+                activation_grads.append(act_grad)
+                loss_sum += float(loss_value)
+                for k, v in metrics.items():
+                    if isinstance(v, (int, float)):
+                        metric_acc[k] = metric_acc.get(k, 0.0) + float(v)
+
+            batch_count = max(len(forward_batches), 1)
+            if metric_acc:
+                metric_acc = {k: v / batch_count for k, v in metric_acc.items()}
+
+            front_weight, client_metrics = client.strategy.run_local_backward(activation_grads)
+
+            train_record = {
+                "server_loss_avg": loss_sum / batch_count,
+                "server_metrics": metric_acc,
+                "client_metrics": client_metrics,
+            }
+
             yield {
-                "updated_weights": updated_weights,
+                "front_weight": front_weight,
                 "train_record": train_record,
                 "data_sample_num": getattr(client.node_var, "data_sample_num", 0),
             }

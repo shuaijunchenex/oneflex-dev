@@ -31,6 +31,10 @@ class FedAggregatorFactory:
                 from .methods._fed_aggregator_sp import FedAggregator_SP
                 print("Using Sum-Product aggregator")
                 return FedAggregator_SP(args)
+            case "sflavg":
+                from .methods._sfl_aggregator_sflavg import SflAggregator_SflAvg
+                print("Using SFLAvg gradient aggregator")
+                return SflAggregator_SflAvg(args)
             case _:
                 raise ValueError(f"Unsupported aggregation method: {args.method}")
         return

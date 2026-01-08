@@ -1,0 +1,4 @@
+trainer:
+  trainer_type: "sl_client"
+  device: "cpu"
+  save_path: "./.training_results/"
