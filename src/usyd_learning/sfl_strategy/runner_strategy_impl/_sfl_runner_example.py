@@ -46,12 +46,14 @@ class SflRunnerStrategy(RunnerStrategy):
             activation_grads = []
             loss_sum = 0.0
             metric_acc = {}
+            grad_norm_sum = 0.0
 
             for smashed_data, labels in forward_batches:
                 server_input, loss, metrics = server_strategy.run_server_forward(smashed_data, labels, training=True)
                 act_grad, loss_value = server_strategy.run_server_backward(server_input, loss, training=True)
                 activation_grads.append(act_grad)
                 loss_sum += float(loss_value)
+                grad_norm_sum += float(act_grad.norm().item())
                 for k, v in metrics.items():
                     if isinstance(v, (int, float)):
                         metric_acc[k] = metric_acc.get(k, 0.0) + float(v)
@@ -59,6 +61,7 @@ class SflRunnerStrategy(RunnerStrategy):
             batch_count = max(len(forward_batches), 1)
             if metric_acc:
                 metric_acc = {k: v / batch_count for k, v in metric_acc.items()}
+            grad_norm_avg = grad_norm_sum / batch_count if batch_count > 0 else 0.0
 
             front_weight, client_metrics = client.strategy.run_local_backward(activation_grads)
 
@@ -67,6 +70,9 @@ class SflRunnerStrategy(RunnerStrategy):
                 "server_metrics": metric_acc,
                 "client_metrics": client_metrics,
             }
+            console.debug(
+                f"[SFL-Server] client {client.node_id} server_loss_avg={loss_sum / batch_count:.4f}, grad_norm_avg={grad_norm_avg:.4f}"
+            )
 
             yield {
                 "front_weight": front_weight,

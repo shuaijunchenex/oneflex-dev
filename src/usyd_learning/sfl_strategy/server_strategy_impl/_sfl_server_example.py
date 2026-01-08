@@ -164,7 +164,8 @@ class SflServerStrategy(ServerStrategy):
         trainer.trainer_args.device = getattr(node_vars, "device", "cpu")
 
         activation_grad, loss_value = trainer.backward_only(server_input, loss, training=training)
-        node_vars.model_weight = node_vars.model.state_dict()
+        latest_state = node_vars.model.state_dict()
+        node_vars.model_weight = latest_state
         return activation_grad, loss_value
 
     def _compose_full_model_for_eval(self, node_vars):

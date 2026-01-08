@@ -10,7 +10,7 @@ from usyd_learning.model_trainer.model_trainer_args import ModelTrainerArgs
 
 from ..model_trainer import ModelTrainer
 from ...ml_utils.model_utils import ModelUtils
-
+from ...ml_utils import console
 
 class ModelTrainer_SlServer(ModelTrainer):
 	"""Split-learning server trainer that updates the rear model segment."""
@@ -27,6 +27,7 @@ class ModelTrainer_SlServer(ModelTrainer):
 
 		self.device = trainer_args.device or ModelUtils.accelerator_device()
 		self.model: nn.Module = trainer_args.model.to(self.device)
+		self.debug = getattr(trainer_args, "debug", False)
 
 	def set_model(self, model: nn.Module):
 		self.trainer_args.model = model
@@ -85,6 +86,11 @@ class ModelTrainer_SlServer(ModelTrainer):
 		optimizer.zero_grad()
 		loss.backward()
 		activation_grad = server_input.grad.detach()
+
+		if hasattr(self, "debug") and self.debug:
+			console.debug(
+				f"[SL-Server] loss={float(loss.item()):.4f}, grad_norm={float(activation_grad.norm().item()):.4f}"
+			)
 
 		if training:
 			optimizer.step()
