@@ -82,6 +82,12 @@ class DatasetLoaderFactory:
             case "imdb":
                 from .loader._dataset_loader_imdb import DatasetLoader_Imdb
                 return DatasetLoader_Imdb().create(data_loader_args, fn)
+            case "sst2":
+                from .loader._dataset_loader_sst2 import DatasetLoader_SST2
+                return DatasetLoader_SST2().create(data_loader_args, fn)
+            case "mrpc" | "mprc":
+                from .loader._dataset_loader_mrpc import DatasetLoader_MRPC
+                return DatasetLoader_MRPC().create(data_loader_args, fn)
             case "dbpedia":
                 from .loader._dataset_loader_dbpedia import DatasetLoader_DBpedia
                 return DatasetLoader_DBpedia().create(data_loader_args, fn)

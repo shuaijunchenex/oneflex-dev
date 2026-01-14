@@ -88,7 +88,7 @@ class ModelTrainer_SlClient(ModelTrainer):
 
 		for inputs, labels in loop:
 			inputs = inputs.to(self.device)
-			smashed_data = ta.model(inputs)
+			smashed_data = ta.model(inputs) # activation
 			smashed_data = smashed_data.to(self.device)
 			smashed_data.retain_grad()
 			self._cached_activations.append(smashed_data)

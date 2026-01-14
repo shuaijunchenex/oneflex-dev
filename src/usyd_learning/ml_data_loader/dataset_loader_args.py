@@ -28,6 +28,7 @@ class DatasetLoaderArgs(KeyValueArgs):
     collate_fn: Any = None
     transform: Any = None
     text_collate_fn: Any = None
+    vocab: Any = None
     # For custom dataset
     dataset = None
 
@@ -48,4 +49,5 @@ class DatasetLoaderArgs(KeyValueArgs):
         self.num_workers = self.get("num_workers", 4)
         self.dataset = self.get("dataset", None)
         self.task_type = self.get("task_type", None)  # cv|nlp
+        self.vocab = self.get("vocab", None)
         return

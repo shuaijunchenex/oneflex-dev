@@ -43,6 +43,9 @@ class NNModelFactory:
             case "imdb_lora_transformer":
                 from .lora._nn_model_imdb_lora_transformer import NNModel_ImdbMSLoRATransformer
                 return NNModel_ImdbMSLoRATransformer().create_model(args)
+            case "peft_transformer":
+                from .transformer.encoder_only._nn_model_peft_transformer import NNModel_PeftTransformer
+                return NNModel_PeftTransformer().create_model(args)
             case "sfl_mlp_client":
                 from .sfl.__nn_model_sfl_mlp_client import NNModel_SflMlpClient
                 return NNModel_SflMlpClient().create_model(args)

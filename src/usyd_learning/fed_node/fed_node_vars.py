@@ -24,6 +24,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
 
     # NOTICE: Static share model
     share_model: nn.Module|None = None
+    share_vocab = None
 
     def __init__(self, config_dict: dict|None = None, is_clone_dict:bool = False):
         EventHandler.__init__(self)
@@ -216,6 +217,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
             data_loader_args.transform = self.data_loader_transform
             if data_loader_args.task_type == "nlp":
                 data_loader_args.tokenizer = self.tokenizer
+                data_loader_args.vocab = FedNodeVars.share_vocab
             self.data_loader = DatasetLoaderFactory.create(data_loader_args)
             data_loader_args.is_train = False  # get test data loader
             self.test_data_loader = DatasetLoaderFactory.create(data_loader_args)
@@ -407,8 +409,12 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
 
     def prepare_vocab(self):
         if "tokenizer" in self.config_dict and self.data_loader.task_type == "nlp":
-            data_input = self.data_loader.get_dataset()
-            self.vocab = self.tokenizer_builder.build_vocab(data_input, self.tokenizer)
+            if FedNodeVars.share_vocab is None:
+                console.info("Building global vocab from server data...")
+                data_input = self.data_loader.get_dataset()
+                FedNodeVars.share_vocab = self.tokenizer_builder.build_vocab(data_input, self.tokenizer)
+            
+            self.vocab = FedNodeVars.share_vocab
 
         return
 
@@ -421,7 +427,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         
         console.info("Prepare vocab tokenizer...", "")
         self.prepare_vocab_tokenizer()
-        console.ok("OK")
+        onsole.ok("OK")
 
         console.info("Prepare data loader...", "")
         self.prepare_data_loader()

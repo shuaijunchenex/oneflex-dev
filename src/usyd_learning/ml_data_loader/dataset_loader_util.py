@@ -49,6 +49,31 @@ class DatasetLoaderUtil:
 
         return input_ids, labels
 
+    @staticmethod
+    def text_pair_collate_fn(batch, tokenizer=None, vocab=None, max_len=256, pad_id=0, combine_fn=None):
+        """
+        Collate function for paired-text datasets (e.g., MRPC).
+        Merges (label, text_a, text_b) into a single text before tokenization.
+        """
+        if tokenizer is None or vocab is None:
+            raise ValueError("text_pair_collate_fn requires tokenizer and vocab.")
+
+        if combine_fn is None:
+            def combine_fn(a, b):
+                return f"{a} [SEP] {b}"
+
+        labels, text_a, text_b = zip(*batch)
+        merged = [combine_fn(a, b) for a, b in zip(text_a, text_b)]
+        merged_batch = list(zip(labels, merged))
+
+        return DatasetLoaderUtil.text_collate_fn(
+            merged_batch,
+            tokenizer=tokenizer,
+            vocab=vocab,
+            max_len=max_len,
+            pad_id=pad_id,
+        )
+
 
     # @staticmethod
     # def text_collate_fn(batch):

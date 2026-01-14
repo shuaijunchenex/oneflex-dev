@@ -51,6 +51,7 @@ class SflRunnerStrategy(RunnerStrategy):
             for smashed_data, labels in forward_batches:
                 server_input, loss, metrics = server_strategy.run_server_forward(smashed_data, labels, training=True)
                 act_grad, loss_value = server_strategy.run_server_backward(server_input, loss, training=True)
+                
                 activation_grads.append(act_grad)
                 loss_sum += float(loss_value)
                 grad_norm_sum += float(act_grad.norm().item())
@@ -63,7 +64,7 @@ class SflRunnerStrategy(RunnerStrategy):
                 metric_acc = {k: v / batch_count for k, v in metric_acc.items()}
             grad_norm_avg = grad_norm_sum / batch_count if batch_count > 0 else 0.0
 
-            front_weight, client_metrics = client.strategy.run_local_backward(activation_grads)
+            front_weight, client_metrics = client.strategy.run_local_backward(activation_grads) # change name to: gradient
 
             train_record = {
                 "server_loss_avg": loss_sum / batch_count,

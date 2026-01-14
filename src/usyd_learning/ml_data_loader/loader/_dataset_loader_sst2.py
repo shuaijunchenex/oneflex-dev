@@ -1,30 +1,32 @@
 from __future__ import annotations
 
+from functools import partial
+from torch.utils.data import DataLoader
+from torchtext.datasets import SST2
 
 from ..dataset_loader import DatasetLoader
 from ..dataset_loader_args import DatasetLoaderArgs
 from ..dataset_loader_util import DatasetLoaderUtil
-from torch.utils.data import DataLoader
-from torchtext.datasets import IMDB
-from torch.utils.data import IterableDataset
 from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
-from functools import partial
 
-import torch
-'''
-Dataset loader for imdb
-'''
-class DatasetLoader_Imdb(DatasetLoader):
+"""
+Dataset loader for SST-2 (GLUE)
+"""
+
+
+class DatasetLoader_SST2(DatasetLoader):
     def __init__(self):
         super().__init__()
 
-    def _warmup_download(self, root: str):
-        for sp in ("train", "test"):
-            it = iter(IMDB(root=root, split=sp))
+    def _warmup_download(self, root: str, splits: tuple[str, ...]):
+        for sp in splits:
             try:
+                it = iter(SST2(root=root, split=sp))
                 next(it)
             except StopIteration:
-                pass
+                continue
+            except Exception:
+                continue
 
     # override
     def _create_inner(self, args: DatasetLoaderArgs) -> None:
@@ -34,40 +36,52 @@ class DatasetLoader_Imdb(DatasetLoader):
         test_batch_size = getattr(args, "test_batch_size", None) or batch_size
         shuffle = getattr(args, "shuffle", True)
         num_workers = getattr(args, "num_workers", 0)
-        
-        self._dataset = IMDB(root=root, split="train")
-        self._test_dataset = IMDB(root=root, split="test")
-
-        self.vocab = getattr(args, "vocab", None)
-        if self.vocab is None:
-            self.vocab = TokenizerBuilder.build_vocab(self._dataset, args.tokenizer)
-        
-        args.vocab_size = len(self.vocab)
+        train_split = getattr(args, "train_split", "train")
+        test_split = getattr(args, "test_split", "dev")
 
         if is_download:
-            self._warmup_download(root)
+            self._warmup_download(root, (train_split, test_split))
+
+        self._dataset = SST2(root=root, split=train_split)
+        self._test_dataset = SST2(root=root, split=test_split)
+
+        tokenizer = getattr(args, "tokenizer")
+        self.vocab = getattr(args, "vocab", None)
+        if self.vocab is None:
+            self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
+            
+        args.vocab_size = len(self.vocab)
+
+        collate = partial(
+            DatasetLoaderUtil.text_collate_fn,
+            tokenizer=tokenizer,
+            vocab=self.vocab,
+        )
 
         self._data_loader = DataLoader(
             self._dataset,
             batch_size=batch_size,
-            shuffle= False,
+            shuffle=shuffle,
             num_workers=num_workers,
-            collate_fn=partial(DatasetLoaderUtil.text_collate_fn, tokenizer=args.tokenizer, vocab=self.vocab),
+            collate_fn=collate,
         )
 
-        self.data_sample_num = 25000
         self.task_type = "nlp"
+        try:
+            self.data_sample_num = len(self._dataset)
+        except Exception:
+            self.data_sample_num = None
+
         self._test_data_loader = DataLoader(
             self._test_dataset,
             batch_size=test_batch_size,
             shuffle=False,
             num_workers=num_workers,
-            collate_fn=partial(DatasetLoaderUtil.text_collate_fn, tokenizer=args.tokenizer, vocab=self.vocab),
+            collate_fn=collate,
         )
         return
 
-    def get_dataset(self) -> DataLoader:
+    def get_dataset(self):
         if self._data_loader is not None:
             return self._data_loader.dataset
-        else:
-            raise ValueError("ERROR: DatasetLoader's data_loader is None.")
+        raise ValueError("ERROR: DatasetLoader's data_loader is None.")
