@@ -34,8 +34,25 @@ class TokenizerBuilder(Handlers):
         self._tokenizer_fn: Optional[Callable[[str], Any]] = None
         self.meta: Dict[str, Any] = {}  # 可选：记录 pad_id / hf_tokenizer 等
 
-        self.register_handler("basic_english", self.__build_basic_english)
-        self.register_handler("bert",           self.__build_bert)
+        self.register_handler("basic_english", self.__wrap_factory_create("basic_english"))
+        self.register_handler("bert",           self.__wrap_factory_create("bert"))
+
+    def __wrap_factory_create(self, t_type: str):
+        def _build():
+            from .tokenizer.tokenizer_factory import TokenizerFactory
+            # TokenizerBuilder's config is passed as the args for creation
+            tk = TokenizerFactory.create_tokenizer(t_type, self.config)
+
+            # Record meta info (like pad_id) back to TokenizerBuilder
+            if hasattr(tk, "meta"):
+                self.meta.update(tk.meta)
+
+            # Return the appropriate callable based on config
+            if tk._encode_fn is not None and str(self.config.get("return_type")).lower() == "ids":
+                return tk.encode
+            return tk.tokenize
+
+        return _build
 
     def build(self) -> Callable[[str], Any]:
         t = str(self.config.get("type", "basic_english")).lower()
@@ -93,17 +110,6 @@ class TokenizerBuilder(Handlers):
     #     # New API: torchtext.datasets.IMDB(root=..., split='train'/'test')
     #     from torchtext.datasets import IMDB
     #     return IMDB(root=root, split=split)
-
-    # -------- builders --------
-    def __build_basic_english(self) -> Callable[[str], Any]:
-        try:
-            from torchtext.data.utils import get_tokenizer
-        except Exception as e:
-            raise ImportError("torchtext is required for 'basic_english' tokenizer.") from e
-
-        lower = self.config.get("lower", True)
-        base = get_tokenizer("basic_english")
-        return (lambda s: base(s.lower())) if lower else base
 
     def __build_bert(self) -> Callable[[str], Any]:
         try:

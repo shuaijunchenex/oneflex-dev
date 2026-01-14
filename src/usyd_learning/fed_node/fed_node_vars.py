@@ -44,7 +44,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.declare_events("on_prepare_data_loader", "on_prepare_data_distribution", "on_prepare_data_handler", "on_prepare_model",
                             "on_prepare_optimizer", "on_prepare_loss_func", "on_prepare_client_selection", "on_prepare_trainer",
                             "on_prepare_aggregation", "on_prepare_strategy", "on_prepare_extractor", "on_prepare_training_logger", 
-                            "on_prepare_lora_inference_model", "on_prepare_tokenizer")
+                            "on_prepare_lora_inference_model", "on_prepare_tokenizer", "on_prepare_vocab")
         return
 
     @property
@@ -77,6 +77,11 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.set_object("data_loader", None)  # Data loader
         self.data_loader_collate_fn = None
         self.data_loader_transform = None
+
+        self.set_object("vocab", None)
+        self.set_object("vocab_size", None)
+        self.set_object("tokenizer", None)
+        self.set_object("tokenizer_builder", None)
 
         self.set_object("data_distribution", None)  # Data distribution
         self.set_object("data_handler", None)  # data_handler
@@ -166,6 +171,38 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
     @data_distribution.setter
     def data_distribution(self, value):
         self.set_object("data_distribution", value)
+
+    @property
+    def tokenizer(self):
+        return self.get_object("tokenizer")
+
+    @tokenizer.setter
+    def tokenizer(self, value):
+        self.set_object("tokenizer", value)
+
+    @property
+    def tokenizer_builder(self):
+        return self.get_object("tokenizer_builder")
+
+    @tokenizer_builder.setter
+    def tokenizer_builder(self, value):
+        self.set_object("tokenizer_builder", value)
+
+    @property
+    def vocab(self):
+        return self.get_object("vocab")
+
+    @vocab.setter
+    def vocab(self, value):
+        self.set_object("vocab", value)
+
+    @property
+    def vocab_size(self):
+        return self.get_object("vocab_size")
+
+    @vocab_size.setter
+    def vocab_size(self, value):
+        self.set_object("vocab_size", value)
 
     @property
     def loss_func(self):
@@ -408,14 +445,22 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         return
 
     def prepare_vocab(self):
-        if "tokenizer" in self.config_dict and self.data_loader.task_type == "nlp":
+        if self.data_loader.task_type == "nlp":
             if FedNodeVars.share_vocab is None:
-                console.info("Building global vocab from server data...")
-                data_input = self.data_loader.get_dataset()
-                FedNodeVars.share_vocab = self.tokenizer_builder.build_vocab(data_input, self.tokenizer)
+                if hasattr(self.data_loader, "vocab") and self.data_loader.vocab is not None:
+                    FedNodeVars.share_vocab = self.data_loader.vocab
+                else:
+                    console.info("Building global vocab from server data...")
+                    data_input = self.data_loader.data_set
+                    FedNodeVars.share_vocab = TokenizerBuilder.build_vocab(data_input, self.tokenizer)
             
             self.vocab = FedNodeVars.share_vocab
+            if self.vocab is not None:
+                self.vocab_size = len(self.vocab)
 
+        # Raise event
+        args = FedNodeEventArgs("vocab", self.config_dict).with_sender(self).with_data(self.vocab)
+        self.raise_event("on_prepare_vocab", args)
         return
 
     # endregion
@@ -427,11 +472,11 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         
         console.info("Prepare vocab tokenizer...", "")
         self.prepare_vocab_tokenizer()
-        onsole.ok("OK")
+        console.ok("OK")
 
         console.info("Prepare data loader...", "")
         self.prepare_data_loader()
-        #self.prepare_vocab()
+        self.prepare_vocab()
         console.ok("OK")
 
         console.info("Prepare data_distribution...", "")

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Iterable, List, Dict, Optional
+from typing import Any, Iterable, List, Dict, Optional, Callable
 from collections import Counter
 import re
 
@@ -16,69 +16,37 @@ class BasicEnglishTokenizer(Tokenizer):
 
     def __init__(self):
         super().__init__()
+        self.lowercase = True
+        self.base_tokenizer = None
 
     def _create_inner(self, args: Any) -> None:
-        # Accept a TokenizerArgs or generic KeyValueArgs-like (with get())
-        if isinstance(args, TokenizerArgs):
-            ta = args
-        else:
-            # best-effort mapping from KeyValueArgs-like
-            ta = TokenizerArgs()
-            try:
-                ta.lowercase = args.get("lowercase", ta.lowercase)
-                ta.remove_punct = args.get("remove_punct", ta.remove_punct)
-                ta.max_length = args.get("max_length", ta.max_length)
-                ta.truncation = args.get("truncation", ta.truncation)
-                ta.vocab = args.get("vocab", ta.vocab)
-                ta.unk_token = args.get("unk_token", ta.unk_token)
-                ta.pad_token = args.get("pad_token", ta.pad_token)
-            except Exception:
-                # ignore and use defaults
-                pass
+        self.__build_basic_english(args)
 
-        word_re = re.compile(r"\w+", flags=re.UNICODE)
-
-        def _tokenize(text: str) -> List[str]:
-            if text is None:
-                return []
-            if not isinstance(text, str):
-                text = str(text)
-
-            proc = text.lower() if ta.lowercase else text
-            if ta.remove_punct:
-                toks = word_re.findall(proc)
-            else:
-                toks = proc.split()
-
-            if ta.truncation and ta.max_length is not None:
-                toks = toks[: ta.max_length]
-            return toks
-
-        self.set_tokenize_fn(_tokenize)
-
-        # encode: if vocab provided, map to ids; otherwise use base class hash fallback
-        if ta.vocab is not None:
-            def _encode(text: str) -> List[int]:
-                toks = _tokenize(text)
-                return [ta.vocab.get(t, ta.vocab.get(ta.unk_token, 0)) for t in toks]
-
-            self.set_encode_fn(_encode)
-
-        # attach args for reference
+    def __build_basic_english(self, args: Any) -> None:
+        from torchtext.data.utils import get_tokenizer
+        self.lowercase = args.get("lowercase", True) if hasattr(args, "get") else getattr(args, "lowercase", True)
+        self.base_tokenizer = get_tokenizer("basic_english")
         self._args = args
+
+    # override
+    def tokenize(self, text: str) -> List[str]:
+        if not self.is_created:
+            raise RuntimeError("Tokenizer not created. Call create(args) first.")
+        if text is None: return []
+        proc = str(text).lower() if self.lowercase else str(text)
+        return self.base_tokenizer(proc)
 
     def build_vocab(self, data_iter: Iterable, special_tokens: Optional[List[str]] = None,
                     max_size: Optional[int] = None, min_freq: int = 1) -> Dict[str, int]:
         counter = Counter()
-        tok_fn = self._tokenize_fn
-        if tok_fn is None:
-            raise RuntimeError("tokenize function not initialized; call create(args) first")
+        if not self.is_created:
+            raise RuntimeError("Tokenizer not initialized; call create(args) first")
 
         for sample in data_iter:
             try:
-                tokens = tok_fn(sample)
+                tokens = self.tokenize(sample)
             except Exception:
-                tokens = tok_fn(str(sample))
+                tokens = self.tokenize(str(sample))
             counter.update(tokens)
 
         # apply min frequency

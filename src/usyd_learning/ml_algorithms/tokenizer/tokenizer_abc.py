@@ -18,8 +18,6 @@ class Tokenizer(ABC):
 
     def __init__(self):
         self._args: KeyValueArgs | None = None
-        self._tokenize_fn: Optional[Callable[[str], List[str]]] = None
-        self._encode_fn: Optional[Callable[[str], List[int]]] = None
         self._is_created: bool = False
         return
 
@@ -46,27 +44,31 @@ class Tokenizer(ABC):
         """Do real initialization here"""
         pass
 
+    @abstractmethod
     def tokenize(self, text: str) -> List[str]:
-        if not self._is_created:
-            raise RuntimeError("Tokenizer not created. Call create(args) first.")
-        if self._tokenize_fn is None:
-            raise NotImplementedError("tokenize not implemented by concrete tokenizer")
-        return self._tokenize_fn(text)
+        """
+        Tokenize text into a list of strings (tokens).
+        """
+        pass
 
     def encode(self, text: str) -> List[int]:
+        """
+        Encode text into a list of integers (token IDs).
+        Default implementation uses hash of tokens.
+        """
         if not self._is_created:
             raise RuntimeError("Tokenizer not created. Call create(args) first.")
-        if self._encode_fn is not None:
-            return self._encode_fn(text)
-        # default: map tokens to hash-based ids if no encode_fn
+        
+        # default: map tokens to hash-based ids if no specific encode logic
         toks = self.tokenize(text)
         return [abs(hash(t)) % (10 ** 9) for t in toks]
 
-    def set_tokenize_fn(self, fn: Callable[[str], List[str]]):
-        self._tokenize_fn = fn
-
-    def set_encode_fn(self, fn: Callable[[str], List[int]]):
-        self._encode_fn = fn
+    def build_vocab(self, data_iter: Iterable, **kwargs) -> Any:
+        """
+        Optional: build vocab from an iterable of samples. Concrete implementations
+        may override.
+        """
+        raise NotImplementedError()
 
     def build_vocab(self, data_iter: Iterable, **kwargs) -> Any:
         """
