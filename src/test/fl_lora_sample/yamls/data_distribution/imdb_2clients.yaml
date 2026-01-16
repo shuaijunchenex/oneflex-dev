@@ -1,0 +1,15 @@
+#-----------------------------
+# Data distribution section
+#-----------------------------
+data_distribution:
+
+  # Use custom distribution
+  use: custom
+
+  # define custom data list for 2 clients
+  # Each row represents a client, each column represents a class (mapped to actual available labels)
+  custom_define:
+    custom: [
+       [12500, 0], # Client 1 gets all samples of class 1 (index 0)
+       [0, 12500]  # Client 2 gets all samples of class 2 (index 1)
+    ]

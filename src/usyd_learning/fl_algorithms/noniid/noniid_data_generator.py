@@ -52,18 +52,37 @@ class NoniidDataGenerator:
     #     self.y_train = torch.cat(labels_list, dim=0)
 
     def _load_data(self):
-        """Load data from DataLoader and store in x_train, y_train (Torch only, no numpy)."""
-        images_list, labels_list = [], []
-        for images, labels in self.dataloader:
-            # 强制保持 tensor 类型
-            if not torch.is_tensor(images):
-                images = torch.as_tensor(images)
+        """Load data from DataLoader. Handles both image tensors and text lists."""
+        data_list, labels_list = [], []
+        for inputs, labels in self.dataloader:
+            # Handle labels: ensure they are Tensors
             if not torch.is_tensor(labels):
                 labels = torch.as_tensor(labels)
-            images_list.append(images)
+            
+            # Handle data (inputs): could be image tensors or text strings
+            if not torch.is_tensor(inputs):
+                try:
+                    inputs = torch.as_tensor(inputs)
+                except (ValueError, TypeError):
+                    # If it's text (list of strings), keep as is
+                    pass
+            
+            data_list.append(inputs)
             labels_list.append(labels)
 
-        self.x_train = torch.cat(images_list, dim=0)
+        # Merge X (data)
+        if len(data_list) > 0 and torch.is_tensor(data_list[0]):
+            self.x_train = torch.cat(data_list, dim=0)
+        else:
+            # Text task: merge into a single large list or object
+            self.x_train = []
+            for b in data_list:
+                if isinstance(b, (list, tuple, torch.Tensor)):
+                    self.x_train.extend(list(b) if torch.is_tensor(b) else b)
+                else:
+                    self.x_train.append(b)
+
+        # Merge Y (labels)
         self.y_train = torch.cat(labels_list, dim=0)
 
     # def _load_data(self):
@@ -86,23 +105,16 @@ class NoniidDataGenerator:
         self.labels_sorted = uniq_sorted
         self.num_classes = len(uniq_sorted)
 
-        self.data_pool = {i: [] for i in range(self.num_classes)}
-        for i, lab in enumerate(uniq_sorted):
-            self.data_pool[i] = self.x_train[self.y_train.flatten() == lab]
+        # Use actual label values as keys in data_pool to avoid mismatch
+        # between label indices and dataset label values (e.g. datasets
+        # that use labels like [1] only). This makes lookups like
+        # self.data_pool[label_idx] valid when label_idx represents the
+        # actual class label from distribution matrices.
+        self.data_pool = {lab: [] for lab in uniq_sorted}
+        for lab in uniq_sorted:
+            self.data_pool[lab] = self.x_train[self.y_train.flatten() == lab]
 
         return self.data_pool
-
-    def _imdb_two_clients_distribution(self):
-        """Build an IMDb-friendly distribution based on the actually loaded labels."""
-        if self.num_classes < 2:
-            raise ValueError(
-                f"IMDb distribution expects 2 classes, but found {self.num_classes} (labels={self.labels_sorted})."
-            )
-
-        # Use the available counts instead of hard-coded numbers to avoid KeyError/insufficient samples
-        c0 = len(self.data_pool.get(0, []))
-        c1 = len(self.data_pool.get(1, []))
-        return [[c0, 0], [0, c1]]
 
     @staticmethod
     def distribution_generator(distribution='mnist_lt', data_volum_list=None):
@@ -256,26 +268,33 @@ class NoniidDataGenerator:
             client_distribution = {}
             
             # Collect data for this client from each class
-            for label_idx, num_samples in enumerate(client_data):
+            for col_idx, num_samples in enumerate(client_data):
                 if num_samples > 0:
-                    pool = self.data_pool.get(label_idx)
+                    # Map the column index in the distribution matrix to the actual label value
+                    # (e.g., if labels_sorted is [1, 2], then col_idx 0 maps to label 1)
+                    if col_idx < len(self.labels_sorted):
+                        label_val = self.labels_sorted[col_idx]
+                    else:
+                        label_val = col_idx # Fallback if matrix cols > available labels
+                    
+                    pool = self.data_pool.get(label_val)
                     if pool is None:
                         raise ValueError(
-                            f"Label index {label_idx} not in data pool. Available labels: {self.labels_sorted}"
+                            f"Label {label_val} (from matrix index {col_idx}) not in data pool. Available: {self.labels_sorted}"
                         )
                     if num_samples > len(pool):
                         raise ValueError(
-                            f"Not enough samples for class {label_idx}: requested {num_samples}, available {len(pool)}"
+                            f"Not enough samples for class {label_val}: requested {num_samples}, available {len(pool)}"
                         )
                     
                     # Select and remove data from pool
                     selected_data = pool[:num_samples]
                     client_images.extend(selected_data)
-                    client_labels.extend([label_idx] * num_samples)
-                    self.data_pool[label_idx] = pool[num_samples:]
+                    client_labels.extend([label_val] * num_samples)
+                    self.data_pool[label_val] = pool[num_samples:]
                     
                     # Update distribution tracking
-                    client_distribution[label_idx] = num_samples
+                    client_distribution[col_idx] = num_samples
             
             # Skip clients with no data
             if len(client_images) == 0:

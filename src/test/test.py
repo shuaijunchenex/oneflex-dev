@@ -22,7 +22,7 @@ def main():
     training_rounds = g_app.training_rounds
 
     # Run app
-    g_app.run("mps",training_rounds)
+    g_app.run("mps", training_rounds)
     return
 
 if __name__ == "__main__":

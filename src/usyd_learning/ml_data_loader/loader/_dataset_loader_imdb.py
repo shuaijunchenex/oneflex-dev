@@ -4,11 +4,12 @@ from __future__ import annotations
 from ..dataset_loader import DatasetLoader
 from ..dataset_loader_args import DatasetLoaderArgs
 from ..dataset_loader_util import DatasetLoaderUtil
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader #
 from torchtext.datasets import IMDB
 from torch.utils.data import IterableDataset
 from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
 from functools import partial
+from datasets import load_dataset
 
 import torch
 '''
@@ -26,6 +27,13 @@ class DatasetLoader_Imdb(DatasetLoader):
             except StopIteration:
                 pass
 
+    def _load_imdb_hf(self):
+        ds = load_dataset("imdb")
+        # 统一成 (label_str, text) 形式，保持与 torchtext.IMDB 对齐
+        train = [("pos" if int(x["label"]) == 1 else "neg", x["text"]) for x in ds["train"]]
+        test = [("pos" if int(x["label"]) == 1 else "neg", x["text"]) for x in ds["test"]]
+        return train, test
+
     # override
     def _create_inner(self, args: DatasetLoaderArgs) -> None:
         root = getattr(args, "root")
@@ -35,8 +43,10 @@ class DatasetLoader_Imdb(DatasetLoader):
         shuffle = getattr(args, "shuffle", True)
         num_workers = getattr(args, "num_workers", 0)
         
-        self._dataset = IMDB(root=root, split="train")
-        self._test_dataset = IMDB(root=root, split="test")
+        self._dataset, self._test_dataset = self._load_imdb_hf()
+
+        # self._dataset = list(IMDB(root=root, split="train"))
+        # self._test_dataset = list(IMDB(root=root, split="test"))
 
         self.vocab = getattr(args, "vocab", None)
         if self.vocab is None:
@@ -50,7 +60,7 @@ class DatasetLoader_Imdb(DatasetLoader):
         self._data_loader = DataLoader(
             self._dataset,
             batch_size=batch_size,
-            shuffle= False,
+            shuffle= True,
             num_workers=num_workers,
             collate_fn=partial(DatasetLoaderUtil.text_collate_fn, tokenizer=args.tokenizer, vocab=self.vocab),
         )
