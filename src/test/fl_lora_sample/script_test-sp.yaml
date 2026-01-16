@@ -1,20 +1,20 @@
-yaml_folder_aggreation_path: ../../yamls/aggregation/
-yaml_folder_client_selection_path: ../../yamls/client_selection/
-yaml_folder_dataset_loader_path: ../../yamls/dataset_loader/
-yaml_folder_data_distribution_path: ../../yamls/data_distribution/
-yaml_folder_loss_func_path: ../../yamls/loss_func/
-yaml_folder_lora_inference_path: ../../yamls/lora_inference/
-yaml_folder_nn_model_path: ../../yamls/nn_model/
-yaml_folder_fl_nodes_path: ../../yamls/fl_nodes/
-yaml_folder_optimizer_path: ../../yamls/optimizer/
-yaml_folder_client_strategy_path: ../../yamls/client_strategy/
-yaml_folder_server_strategy_path: ../../yamls/server_strategy/
-yaml_folder_runner_strategy_path: ../../yamls/runner_strategy/
-yaml_folder_trainer_path: ../../yamls/trainer/
-yaml_folder_training_logger_path: ../../yamls/training_logger/
-yaml_folder_training_path: ../../yamls/training/
-yaml_folder_general_path: ../../yamls/general
-yaml_folder_rank_distribution_path: ../../yamls/rank_distribution
+yaml_folder_aggreation_path: ./yamls/aggregation/
+yaml_folder_client_selection_path: ./yamls/client_selection/
+yaml_folder_dataset_loader_path: ./yamls/dataset_loader/
+yaml_folder_data_distribution_path: ./yamls/data_distribution/
+yaml_folder_loss_func_path: ./yamls/loss_func/
+yaml_folder_lora_inference_path: ./yamls/lora_inference/
+yaml_folder_nn_model_path: ./yamls/nn_model/
+yaml_folder_fl_nodes_path: ./yamls/fl_nodes/
+yaml_folder_optimizer_path: ./yamls/optimizer/
+yaml_folder_client_strategy_path: ./yamls/client_strategy/
+yaml_folder_server_strategy_path: ./yamls/server_strategy/
+yaml_folder_runner_strategy_path: ./yamls/runner_strategy/
+yaml_folder_trainer_path: ./yamls/trainer/
+yaml_folder_training_logger_path: ./yamls/training_logger/
+yaml_folder_training_path: ./yamls/training/
+yaml_folder_general_path: ./yamls/general
+yaml_folder_rank_distribution_path: ./yamls/rank_distribution
 yaml_folder_aggreation_files:
 - aggregation_rbla.yaml: aggregation_rbla
 - aggregation_sp.yaml: aggregation_sp

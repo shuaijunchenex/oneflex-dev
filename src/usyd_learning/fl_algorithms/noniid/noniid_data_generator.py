@@ -21,6 +21,7 @@ class NoniidDataGenerator:
         self.data_pool = None
         self.x_train = []
         self.y_train = []
+        self.labels_sorted = []  # keep original label ordering for diagnostics
 
         # Load data into memory
         self._load_data()
@@ -82,6 +83,7 @@ class NoniidDataGenerator:
         """
         uniq = torch.unique(self.y_train).tolist()
         uniq_sorted = sorted(int(l) for l in uniq)        # e.g. IMDb: [0,1]
+        self.labels_sorted = uniq_sorted
         self.num_classes = len(uniq_sorted)
 
         self.data_pool = {i: [] for i in range(self.num_classes)}
@@ -89,6 +91,18 @@ class NoniidDataGenerator:
             self.data_pool[i] = self.x_train[self.y_train.flatten() == lab]
 
         return self.data_pool
+
+    def _imdb_two_clients_distribution(self):
+        """Build an IMDb-friendly distribution based on the actually loaded labels."""
+        if self.num_classes < 2:
+            raise ValueError(
+                f"IMDb distribution expects 2 classes, but found {self.num_classes} (labels={self.labels_sorted})."
+            )
+
+        # Use the available counts instead of hard-coded numbers to avoid KeyError/insufficient samples
+        c0 = len(self.data_pool.get(0, []))
+        c1 = len(self.data_pool.get(1, []))
+        return [[c0, 0], [0, c1]]
 
     @staticmethod
     def distribution_generator(distribution='mnist_lt', data_volum_list=None):
@@ -209,6 +223,97 @@ class NoniidDataGenerator:
             return data_volum_list
         else:
             raise ValueError("Invalid distribution type. Choose 'mnist_lt' or 'custom'.")
+
+    def generate_noniid_data(self, data_volum_list=None, verify_allocate=True, distribution="mnist_lt", batch_size=64, shuffle=False, num_workers=0):
+        """
+        Distributes imbalanced data to different clients based on predefined patterns and returns a list of DataLoader for each client.
+
+        Args:
+            data_volum_list (list): A list containing data volume for different classes (used only if distribution="custom").
+            verify_allocate (bool): Whether to print allocation results.
+            distribution (str): Default is "mnist_lt", supports different distributions.
+            batch_size (int): Number of samples per batch for the DataLoader.
+            shuffle (bool): Whether to shuffle the data in the DataLoader.
+            num_workers (int): Number of worker threads for the DataLoader.
+
+        Returns:
+            list: A list of DataLoader objects, each corresponding to one client's data.
+        """
+        # Ensure data_pool is initialized
+        if self.data_pool is None:
+            raise ValueError("Data pool is not created. Call create_data_pool() first.")
+
+        # Always use the provided distribution matrix (predefined or custom).
+        distribution_pattern = self.distribution_generator(distribution, data_volum_list)
+
+        # Allocate data for each client
+        allocated_data = []
+        for client_idx, client_data in enumerate(distribution_pattern):
+            client_images = []
+            client_labels = []
+            
+            # Track client's distribution for verification
+            client_distribution = {}
+            
+            # Collect data for this client from each class
+            for label_idx, num_samples in enumerate(client_data):
+                if num_samples > 0:
+                    pool = self.data_pool.get(label_idx)
+                    if pool is None:
+                        raise ValueError(
+                            f"Label index {label_idx} not in data pool. Available labels: {self.labels_sorted}"
+                        )
+                    if num_samples > len(pool):
+                        raise ValueError(
+                            f"Not enough samples for class {label_idx}: requested {num_samples}, available {len(pool)}"
+                        )
+                    
+                    # Select and remove data from pool
+                    selected_data = pool[:num_samples]
+                    client_images.extend(selected_data)
+                    client_labels.extend([label_idx] * num_samples)
+                    self.data_pool[label_idx] = pool[num_samples:]
+                    
+                    # Update distribution tracking
+                    client_distribution[label_idx] = num_samples
+            
+            # Skip clients with no data
+            if len(client_images) == 0:
+                continue
+                
+            # Store client data
+            allocated_data.append({
+                'images': client_images,
+                'labels': client_labels,
+                'distribution': client_distribution
+            })
+            
+            # Verify allocation results
+            if verify_allocate:
+                print(f"Client {client_idx + 1} distribution:")
+                for label, count in client_distribution.items():
+                    print(f"  Label {label}: {count} samples")
+                print(f"  Total samples: {len(client_images)}")
+
+        # Create DataLoader for each client
+        train_loaders = []
+        
+        for client_idx, client_data in enumerate(allocated_data):
+            # Skip if client has no data
+            if len(client_data['images']) == 0:
+                continue
+            
+            # Create dataset (without transform)
+            train_dataset = CustomDataset(
+                client_data['images'], 
+                client_data['labels'], 
+                transform=None  # No transform applied
+            )
+
+            train_loaders.append(train_dataset)
+
+        return train_loaders
+    
         
     # def generate_noniid_data(self, data_volum_list=None, verify_allocate=True,
     #                         distribution="mnist_lt", batch_size=64, shuffle=False, num_workers=0):
@@ -294,86 +399,3 @@ class NoniidDataGenerator:
     #         train_loaders.append(loader)
 
     #     return train_loaders
-
-    def generate_noniid_data(self, data_volum_list=None, verify_allocate=True, distribution="mnist_lt", batch_size=64, shuffle=False, num_workers=0):
-        """
-        Distributes imbalanced data to different clients based on predefined patterns and returns a list of DataLoader for each client.
-
-        Args:
-            data_volum_list (list): A list containing data volume for different classes (used only if distribution="custom").
-            verify_allocate (bool): Whether to print allocation results.
-            distribution (str): Default is "mnist_lt", supports different distributions.
-            batch_size (int): Number of samples per batch for the DataLoader.
-            shuffle (bool): Whether to shuffle the data in the DataLoader.
-            num_workers (int): Number of worker threads for the DataLoader.
-
-        Returns:
-            list: A list of DataLoader objects, each corresponding to one client's data.
-        """
-        # Ensure data_pool is initialized
-        if self.data_pool is None:
-            raise ValueError("Data pool is not created. Call create_data_pool() first.")
-
-        # Get the distribution pattern
-        distribution_pattern = self.distribution_generator(distribution, data_volum_list)
-
-        # Allocate data for each client
-        allocated_data = []
-        for client_idx, client_data in enumerate(distribution_pattern):
-            client_images = []
-            client_labels = []
-            
-            # Track client's distribution for verification
-            client_distribution = {}
-            
-            # Collect data for this client from each class
-            for label_idx, num_samples in enumerate(client_data):
-                if num_samples > 0:
-                    if num_samples > len(self.data_pool[label_idx]):
-                        raise ValueError(f"Not enough samples for class {label_idx}: requested {num_samples}, available {len(self.data_pool[label_idx])}")
-                    
-                    # Select and remove data from pool
-                    selected_data = self.data_pool[label_idx][:num_samples]
-                    client_images.extend(selected_data)
-                    client_labels.extend([label_idx] * num_samples)
-                    self.data_pool[label_idx] = self.data_pool[label_idx][num_samples:]
-                    
-                    # Update distribution tracking
-                    client_distribution[label_idx] = num_samples
-            
-            # Skip clients with no data
-            if len(client_images) == 0:
-                continue
-                
-            # Store client data
-            allocated_data.append({
-                'images': client_images,
-                'labels': client_labels,
-                'distribution': client_distribution
-            })
-            
-            # Verify allocation results
-            if verify_allocate:
-                print(f"Client {client_idx + 1} distribution:")
-                for label, count in client_distribution.items():
-                    print(f"  Label {label}: {count} samples")
-                print(f"  Total samples: {len(client_images)}")
-
-        # Create DataLoader for each client
-        train_loaders = []
-        
-        for client_idx, client_data in enumerate(allocated_data):
-            # Skip if client has no data
-            if len(client_data['images']) == 0:
-                continue
-            
-            # Create dataset (without transform)
-            train_dataset = CustomDataset(
-                client_data['images'], 
-                client_data['labels'], 
-                transform=None  # No transform applied
-            )
-
-            train_loaders.append(train_dataset)
-
-        return train_loaders

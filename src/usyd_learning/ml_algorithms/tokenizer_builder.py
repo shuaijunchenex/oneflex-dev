@@ -48,8 +48,15 @@ class TokenizerBuilder(Handlers):
                 self.meta.update(tk.meta)
 
             # Return the appropriate callable based on config
-            if tk._encode_fn is not None and str(self.config.get("return_type")).lower() == "ids":
+            return_type = str(self.config.get("return_type", "tokens")).lower()
+
+            # Some tokenizers expose an internal `_encode_fn`; fall back to
+            # the public `encode` if present.
+            encode_available = getattr(tk, "_encode_fn", None) is not None or hasattr(tk, "encode")
+
+            if return_type == "ids" and encode_available:
                 return tk.encode
+
             return tk.tokenize
 
         return _build

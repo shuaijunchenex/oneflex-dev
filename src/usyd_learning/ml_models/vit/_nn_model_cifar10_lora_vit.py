@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from ..transformer_encoder._nn_model_transformer_encoder import TransformerEncoder
+from ..transformer._nn_model_transformer_encoder import TransformerEncoder
 from ...ml_algorithms.lora.impl.lora_cifar_vit import PatchEmbed, Attention, MLP, Block
 from ...ml_algorithms.lora import MSLoRALinear
 from .. import AbstractNNModel, NNModelArgs, NNModel

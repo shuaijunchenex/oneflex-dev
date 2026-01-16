@@ -15,8 +15,8 @@ from .lora._nn_model_simple_lora_cnn import NNModel_SimpleLoRACNN
 
 from .mobilenet._nn_model_thin_mobilenet import NNModel_ModifiedNet, SeparableConv2d
 
-from .transformer_encoder._nn_model_multi_head_self_attention import MultiHeadSelfAttention
-from .transformer_encoder._nn_model_transformer_encoder import TransformerEncoder
+from .transformer._nn_model_multi_head_self_attention import MultiHeadSelfAttention
+from .transformer._nn_model_transformer_encoder import TransformerEncoder
 
 from .vit._nn_model_cifar10_lora_vit import ViT_MSLoRA_CIFAR10
 

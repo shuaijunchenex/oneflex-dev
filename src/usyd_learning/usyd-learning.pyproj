@@ -122,8 +122,8 @@
     <Compile Include="ml_models\nn_model_abc.py" />
     <Compile Include="ml_models\nn_model_args.py" />
     <Compile Include="ml_models\nn_model_factory.py" />
-    <Compile Include="ml_models\transformer_encoder\_nn_model_multi_head_self_attention.py" />
-    <Compile Include="ml_models\transformer_encoder\_nn_model_transformer_encoder.py" />
+    <Compile Include="ml_models\transformer\_nn_model_multi_head_self_attention.py" />
+    <Compile Include="ml_models\transformer\_nn_model_transformer_encoder.py" />
     <Compile Include="ml_models\vit\_nn_model_simple_vit.py" />
     <Compile Include="ml_models\vit\_nn_model_vit.py" />
     <Compile Include="ml_models\__init__.py" />
@@ -204,7 +204,7 @@
     <Folder Include="ml_models\models\" />
     <Folder Include="ml_models\lora\" />
     <Folder Include="ml_models\mobilenet\" />
-    <Folder Include="ml_models\transformer_encoder\" />
+    <Folder Include="ml_models\transformer\" />
     <Folder Include="ml_models\vit\" />
     <Folder Include="ml_simu_switcher\" />
     <Folder Include="ml_utils\event_handler\" />
