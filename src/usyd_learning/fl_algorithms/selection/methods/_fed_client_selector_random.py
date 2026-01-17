@@ -25,4 +25,8 @@ class FedClientSelector_Random(FedClientSelector):
         if select_number <= 0:
             select_number = self._args.select_number
 
+        # If available clients are less than or equal to requested number, select all
+        if len(client_list) <= select_number:
+            return client_list
+
         return random.sample(client_list, select_number)

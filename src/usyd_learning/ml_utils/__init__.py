@@ -15,6 +15,7 @@ from .filename_helper import FileNameHelper, FileNameParts
 from .app_entry import AppEntry
 from .dict_path import DictPath, set_dict_value, get_dict_value
 from .console import console
+from .device_checker import DeviceChecker
 from .string import String
 from .startup_init import startup_init_path
 from .functions import dict_get, dict_exists
@@ -22,5 +23,5 @@ from .figure_plotter import FigurePlotter
 
 __all__ = ["ConfigLoader", "FileNameMaker", "FileNameMakerNames", "Handlers", "MultiHandlers", "AppEntry", "FileNameHelper", "FileNameParts",
            "TrainingLogger", "CsvDataRecorder", "EventHandler", "KeyValueArgs", "ObjectMap", "KeyValueMap", "FigurePlotter",
-           "EventArgs", "TextLogger", "String", "console", "DictPath",
+           "EventArgs", "TextLogger", "String", "console", "DictPath", "DeviceChecker",
            "startup_init_path", "set_dict_value", "get_dict_value", "dict_get", "dict_exists"]

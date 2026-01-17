@@ -9,10 +9,10 @@ startup_init_path(os.path.dirname(os.path.abspath(__file__)))
 #-----------------------------------------------------------------
 
 # import
-from usyd_learning.ml_utils import console
-from fl_lora_sample.lora_sample_entry import SampleAppEntry
+from usyd_learning.ml_utils import console, DeviceChecker
+from fl_lora_sample.standard_sample_entry import StandardSampleEntry
 
-g_app = SampleAppEntry()
+g_app = StandardSampleEntry()
 
 def main():
     # Load app config set from yaml file
@@ -22,7 +22,7 @@ def main():
     training_rounds = g_app.training_rounds
 
     # Run app
-    g_app.run("mps", training_rounds)
+    g_app.run(DeviceChecker.get_device(), training_rounds)
     return
 
 if __name__ == "__main__":

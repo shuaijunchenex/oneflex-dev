@@ -46,6 +46,30 @@ class NNModelFactory:
             case "peft_transformer":
                 from .transformer.encoder_only._nn_model_peft_transformer import NNModel_PeftTransformer
                 return NNModel_PeftTransformer().create_model(args)
+            case "transformer_decoder_only_imdb":
+                from .transformer.decoder_only._nn_model_decoder_only_imdb import NNModel_DecoderOnlyIMDB
+                return NNModel_DecoderOnlyIMDB().create_model(args)
+            case "transformer_encoder_only_imdb":
+                from .transformer.encoder_only._nn_model_encoder_only_imdb import NNModel_EncoderOnlyIMDB
+                return NNModel_EncoderOnlyIMDB().create_model(args)
+            case "transformer_encode_decoder_imdb":
+                from .transformer.encode_decoder._nn_model_encode_decoder_imdb import NNModel_EncodeDecoderIMDB
+                return NNModel_EncodeDecoderIMDB().create_model(args)
+            case "transformer_hybrid_imdb":
+                from .transformer.hybrid._nn_model_hybrid_imdb import NNModel_HybridIMDB
+                return NNModel_HybridIMDB().create_model(args)
+            case "transformer_tiny_scratch_imdb":
+                from .transformer.encoder_only._nn_model_tiny_scratch_imdb import NNModel_TinyScratchIMDB
+                return NNModel_TinyScratchIMDB().create_model(args)
+            case "transformer_classification":
+                from .transformer.encoder_only._nn_model_transformer_classification import NNModel_TransformerClassification
+                return NNModel_TransformerClassification().create_model(args)
+            case "transformer_decoder_classification":
+                from .transformer.decoder_only._nn_model_decoder_only_classification import NNModel_DecoderOnlyClassification
+                return NNModel_DecoderOnlyClassification().create_model(args)
+            case "transformer_encode_decoder_classification":
+                from .transformer.encode_decoder._nn_model_encode_decoder_classification import NNModel_EncodeDecoderClassification
+                return NNModel_EncodeDecoderClassification().create_model(args)
             case "sfl_mlp_client":
                 from .sfl.__nn_model_sfl_mlp_client import NNModel_SflMlpClient
                 return NNModel_SflMlpClient().create_model(args)
