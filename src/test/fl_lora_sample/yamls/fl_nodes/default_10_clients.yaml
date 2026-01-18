@@ -10,4 +10,5 @@ client_nodes:
   
 # Define server node, only ONE node
 server_node:
+  #id_prefix: server
   id: server-1         # Server node id

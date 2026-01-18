@@ -14,6 +14,7 @@ yaml_folder_trainer_path: ./yamls/trainer/
 yaml_folder_training_logger_path: ./yamls/training_logger/
 yaml_folder_training_path: ./yamls/training/
 yaml_folder_general_path: ./yamls/general
+yaml_folder_role_path: ./yamls/role/
 yaml_folder_rank_distribution_path: ./yamls/rank_distribution
 yaml_folder_tokenizer_path: ./yamls/tokenlizer/
 yaml_folder_aggreation_files:
@@ -25,6 +26,10 @@ yaml_folder_client_selection_files:
 
 yaml_folder_tokenizer_files:
 - basic_english.yaml: tokenizer_basic_english
+
+yaml_folder_role_files:
+- server.yaml: role_server
+- client.yaml: role_client
 
 yaml_folder_dataset_loader_files:
 - mnist.yaml: dataset_loader_mnist
@@ -90,12 +95,15 @@ yaml_folder_rank_distribution_files:
 - rank001.yaml: rank_distribution_001_homogeneous
 - rank002.yaml: rank_distribution_002_homogeneous
 yaml_combination:
+
   runner:
   - general_round100
   - training_logger
   - fl_nodes_2_clients
   - sp_runner_strategy
+
   client_yaml:
+  - role_client
   - training_logger
   - dataset_loader_imdb
   - nn_model_imdb_transformer_lora
@@ -105,8 +113,11 @@ yaml_combination:
   - sp_client_strategy
   - trainer_imdb
   - tokenizer_basic_english
+
   edge_yaml: []
+
   server_yaml:
+  - role_server
   - general_round100
   - training_logger
   - dataset_loader_imdb

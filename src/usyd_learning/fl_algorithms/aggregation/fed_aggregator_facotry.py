@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .fed_aggregator_abc import AbstractFedAggregator
 from .fed_aggregator_args import FedAggregatorArgs
-
+from ...ml_utils import console
 
 class FedAggregatorFactory:
     '''
@@ -21,19 +21,19 @@ class FedAggregatorFactory:
         match args.method:
             case "fedavg":
                 from .methods._fed_aggregator_fedavg import FedAggregator_FedAvg
-                print("Using FedAvg aggregator")
+                console.debug("Using FedAvg aggregator")
                 return FedAggregator_FedAvg(args)
             case "rbla":
                 from .methods._fed_aggregator_rbla import FedAggregator_RBLA
-                print("Using RBLA aggregator")
+                console.debug("Using RBLA aggregator")
                 return FedAggregator_RBLA(args)
             case "sp":
                 from .methods._fed_aggregator_sp import FedAggregator_SP
-                print("Using Sum-Product aggregator")
+                console.debug("Using Sum-Product aggregator")
                 return FedAggregator_SP(args)
             case "sflavg":
                 from .methods._sfl_aggregator_sflavg import SflAggregator_SflAvg
-                print("Using SFLAvg gradient aggregator")
+                console.debug("Using SFLAvg gradient aggregator")
                 return SflAggregator_SflAvg(args)
             case _:
                 raise ValueError(f"Unsupported aggregation method: {args.method}")

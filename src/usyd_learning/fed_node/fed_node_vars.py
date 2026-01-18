@@ -123,6 +123,10 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
     @data_loader.setter
     def data_loader(self, value):
         self.set_object("data_loader", value)
+        # If it's an NLP task and we already have a shared vocab, inject it into the data_loader
+        if value is not None and self.vocab is not None:
+            if hasattr(value, "vocab") and value.vocab is None:
+                value.vocab = self.vocab
 
     @property
     def model(self) -> nn.Module :
@@ -293,14 +297,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         if String.is_none_or_empty(name):
             raise ValueError("Error: Missing model name in yaml.")
         
-        # Determine task type reliably
-        task_type = "image" # default
-        if self.data_loader is not None:
-            task_type = self.data_loader.task_type
-        elif "data_loader" in self.config_dict:
-            task_type = self.config_dict["data_loader"].get("task_type", "image")
-
-        if task_type != "nlp":
+        if self.config_dict["data_loader"]["task_type"] != "nlp":
             is_share_model = config.get("share_model", True)  # NOTICE: Share model
             if is_share_model and FedNodeVars.share_model is not None:
                 self.model = FedNodeVars.share_model
@@ -313,7 +310,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
             if is_share_model and FedNodeVars.share_model is None:
                 FedNodeVars.share_model = self.model
 
-        elif task_type == "nlp":
+        elif self.config_dict["data_loader"]["task_type"] == "nlp":
             is_share_model = config.get("share_model", True)  # NOTICE: Share model
             if is_share_model and FedNodeVars.share_model is not None:
                 self.model = FedNodeVars.share_model
@@ -366,8 +363,6 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         # build trainer
         trainer_args = ModelTrainerFactory.create_args(self.config_dict["trainer"])
         trainer_type = self.config_dict.get("trainer", {}).get("trainer_type", trainer_args.trainer_type)
-        
-        # In simulation, client's data_loader is often None at this point and set later
         trainer_args.set_trainer_args(self.model, self.optimizer, self.loss_func, self.data_loader, trainer_type)
         self.trainer = ModelTrainerFactory.create(trainer_args)
 
@@ -386,8 +381,9 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         return
     
     def prepare_model_evaluator(self):
-        if self.data_loader is not None:
-            self.model_evaluator = ModelEvaluator(self.model, self.data_loader, self.loss_func)
+
+        self.model_evaluator = ModelEvaluator(self.model, self.data_loader, self.loss_func)
+
         return
 
     def prepare_strategy(self):
@@ -425,13 +421,13 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
             config['rank_ratio'] = max(self.config_dict["rank_distribution"]["rank_ratio_list"])
             args = NNModelFactory.create_args(config)
 
-            if self.data_loader.task_type != "nlp":
+            if self.config_dict["data_loader"]["task_type"] != "nlp":
                 self.inference_model = NNModelFactory.create(args)
                 aligned_weight = LoRAUtils.replace_weight_and_bias(self.inference_model.state_dict(), self.model.state_dict())
                 self.model_evaluator.change_model(self.inference_model, aligned_weight)
                 # Raise extractor event
 
-            elif self.data_loader.task_type == "nlp":
+            elif self.config_dict["data_loader"]["task_type"] == "nlp":
                 args = NNModelFactory.create_args(config)
                 args.vocab_size = self.vocab_size
                 self.inference_model = NNModelFactory.create(args)
@@ -478,38 +474,52 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.raise_event("on_prepare_vocab", args)
         return
 
-    # endregion
-
     def prepare(self) -> Any:
         """
         Prepare components. In a simulated environment, clients skip redundant data loading
         and server-only configurations.
         """
-        # Determine if this node acts as a server based on its configuration
-        is_server = "aggregation" in self.config_dict or "client_selection" in self.config_dict
-        
-        if is_server:
-            console.info("Prepare vocab tokenizer (Server)...", "")
-            self.prepare_vocab_tokenizer()
-            console.ok("OK")
+        # Determine if this node acts as a server based on its configuration (id or prefix)
+        role = self.config_dict.get("role", "client")
 
-            console.info("Prepare data loader (Server)...", "")
-            self.prepare_data_loader()
-            self.prepare_vocab()
-            console.ok("OK")
+        console.info(f"========================== [ Prepare {role.upper()} ] ==========================")
 
-            console.info("Prepare data_distribution...", "")
-            self.prepare_data_distribution()
-            console.ok("OK")
-
-            console.info("Prepare data handler...", "")
-            self.prepare_data_handler()
-            console.ok("OK")
+        if role == "server":
+            self._prepare_role_server()
         else:
-            # For clients, we may still need vocab/tokenizer information if it's an NLP task
-            if "tokenizer" in self.config_dict:
-                self.prepare_vocab_tokenizer()
-                self.prepare_vocab()
+            self._prepare_role_client()
+
+        console.info(f"{role} prepare completed.")
+        console.ok(f"========================== [ {role.upper()} READY ] ==========================")
+
+        return self
+
+    def _prepare_role_server(self):
+        """Prepare steps specific to Server node"""
+        console.info("Prepare vocab tokenizer (Server)...", "")
+        self.prepare_vocab_tokenizer()
+        console.ok("OK")
+
+        console.info("Prepare data loader (Server)...", "")
+        self.prepare_data_loader()
+        self.prepare_vocab()
+        console.ok("OK")
+
+        console.info("Prepare data_distribution...", "")
+        self.prepare_data_distribution()
+        console.ok("OK")
+
+        console.info("Prepare data handler...", "")
+        self.prepare_data_handler()
+        console.ok("OK")
+
+        console.info("Prepare client selection...", "")
+        self.prepare_client_selection()
+        console.ok("OK")
+
+        console.info(f"Prepare aggregation...", "")
+        self.prepare_aggregation()
+        console.ok("OK")
 
         console.info("Prepare NN model...", "")
         self.prepare_model()
@@ -523,19 +533,6 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.prepare_loss_func()
         console.ok("OK")
 
-        if is_server:
-            console.info("Prepare client selection...", "")
-            self.prepare_client_selection()
-            console.ok("OK")
-
-            console.info("Prepare aggregation...", "")
-            self.prepare_aggregation()
-            console.ok("OK")
-        
-        console.info("Prepare extractor...", "")
-        self.prepare_extractor()
-        console.ok("OK")
-
         # Prepare logger
         console.info("Prepare training logger...", "")
         self.prepare_training_logger()
@@ -545,18 +542,43 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.prepare_model_evaluator()
         console.ok("OK")
         
-        console.info("Prepare trainer...", "")
+        console.info(f"Prepare trainer...", "")
         self.prepare_trainer()
         console.ok("OK")
 
-        if is_server:
-            console.info("check global model for inference", "")
-            self.prepare_global_inference_model()
-            console.ok("OK")
+        console.info("check global model for inference", "")
+        self.prepare_global_inference_model()
+        console.ok("OK")
+        return
 
-        console.info("Prepare completed.")
+    def _prepare_role_client(self):
+        """Prepare steps specific to Client node"""
+        # For clients, we may still need vocab/tokenizer information if it's an NLP task
 
-        return self
+        console.info("Prepare vocab tokenizer (Client)...", "")
+        self.prepare_vocab_tokenizer()
+        console.ok("OK")
+
+        console.info("Prepare vocab (Client)...", "")
+        self.prepare_vocab()
+        console.ok("OK")
+
+        console.info("Prepare NN model...", "")
+        self.prepare_model()
+        console.ok("OK")
+
+        console.info("Prepare optimizer...", "")
+        self.prepare_optimizer()
+        console.ok("OK")
+
+        console.info("Prepare loss function...", "")
+        self.prepare_loss_func()
+        console.ok("OK")
+        
+        console.info(f"Prepare trainer...", "")
+        self.prepare_trainer()
+        console.ok("OK")
+        return
 
     def prepare_strategy_only(self):
         console.info("Prepare strategy...", "")

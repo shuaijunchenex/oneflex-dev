@@ -14,7 +14,7 @@ class ModelUtils:
         else:
             device = torch.device("cpu")
 
-        console.info(f"Using device: {device}")
+        console.debug(f"Using device: {device}")
         return device
 
     @staticmethod

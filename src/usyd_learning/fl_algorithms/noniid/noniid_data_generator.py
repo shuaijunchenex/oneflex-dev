@@ -309,10 +309,11 @@ class NoniidDataGenerator:
             
             # Verify allocation results
             if verify_allocate:
-                print(f"Client {client_idx + 1} distribution:")
+                from ...ml_utils import console
+                console.debug(f"Client {client_idx + 1} distribution:")
                 for label, count in client_distribution.items():
-                    print(f"  Label {label}: {count} samples")
-                print(f"  Total samples: {len(client_images)}")
+                    console.debug(f"  Label {label}: {count} samples")
+                console.debug(f"  Total samples: {len(client_images)}")
 
         # Create DataLoader for each client
         train_loaders = []
