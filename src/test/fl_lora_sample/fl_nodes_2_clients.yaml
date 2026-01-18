@@ -1,0 +1,6 @@
+server:
+  id: "server"
+client_num: 2
+clients:
+  - id: "client_0"
+  - id: "client_1"

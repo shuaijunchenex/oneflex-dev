@@ -1,0 +1,39 @@
+app:
+  client_yaml: "imdb_2clients.yaml"
+  server_yaml: "imdb_2clients.yaml"
+  runner: "fl_nodes_2_clients.yaml"
+
+data_loader:
+  name: "imdb"
+  task_type: "nlp"
+  batch_size: 16
+  is_download: True
+  is_load_train_set: True
+  is_load_test_set: True
+
+tokenizer:
+  name: "basic_english"
+  max_length: 256
+
+nn_model:
+  type: "transformer_tiny_scratch_imdb"
+  input_dim: 256
+  output_dim: 2
+
+optimizer:
+  type: "AdamW"
+  lr: 0.005
+
+loss_func:
+  type: "CrossEntropyLoss"
+
+data_distribution:
+  use: "dirichlet"
+  alpha: 0.5
+
+client_selection:
+  type: "random"
+  target_num: 2
+
+aggregation:
+  type: "fedavg"

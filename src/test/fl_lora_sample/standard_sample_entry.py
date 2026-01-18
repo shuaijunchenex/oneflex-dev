@@ -7,7 +7,7 @@ import torch
 
 from usyd_learning.fed_node import FedNodeVars, FedNodeEventArgs
 from usyd_learning.fed_runner import FedRunner
-from usyd_learning.ml_utils import AppEntry, console
+from usyd_learning.ml_utils import AppEntry, console, DeviceChecker
 from usyd_learning.fl_algorithms.noniid.noniid_data_generator import NoniidDataGenerator
 from usyd_learning.ml_data_loader.dataset_loader_factory import DatasetLoaderFactory
 from usyd_learning.ml_data_loader.dataset_loader_args import DatasetLoaderArgs
@@ -24,7 +24,11 @@ class StandardSampleEntry(AppEntry):
         self.server_yaml = None 
 
     #override
-    def run(self, device = 'cpu', training_rounds = 50):
+    def run(self, device = None, training_rounds = 50):
+
+        if device is None:
+            device = DeviceChecker().get_device_str()
+            console.info(f"Auto-detected device: {device}")
 
         # Yamls - if yamls are None, get yaml from app config file automatically
         if self.runner_yaml is None:

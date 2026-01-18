@@ -293,7 +293,14 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         if String.is_none_or_empty(name):
             raise ValueError("Error: Missing model name in yaml.")
         
-        if self.data_loader.task_type != "nlp":
+        # Determine task type reliably
+        task_type = "image" # default
+        if self.data_loader is not None:
+            task_type = self.data_loader.task_type
+        elif "data_loader" in self.config_dict:
+            task_type = self.config_dict["data_loader"].get("task_type", "image")
+
+        if task_type != "nlp":
             is_share_model = config.get("share_model", True)  # NOTICE: Share model
             if is_share_model and FedNodeVars.share_model is not None:
                 self.model = FedNodeVars.share_model
@@ -306,7 +313,7 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
             if is_share_model and FedNodeVars.share_model is None:
                 FedNodeVars.share_model = self.model
 
-        elif self.data_loader.task_type == "nlp":
+        elif task_type == "nlp":
             is_share_model = config.get("share_model", True)  # NOTICE: Share model
             if is_share_model and FedNodeVars.share_model is not None:
                 self.model = FedNodeVars.share_model
@@ -359,6 +366,8 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         # build trainer
         trainer_args = ModelTrainerFactory.create_args(self.config_dict["trainer"])
         trainer_type = self.config_dict.get("trainer", {}).get("trainer_type", trainer_args.trainer_type)
+        
+        # In simulation, client's data_loader is often None at this point and set later
         trainer_args.set_trainer_args(self.model, self.optimizer, self.loss_func, self.data_loader, trainer_type)
         self.trainer = ModelTrainerFactory.create(trainer_args)
 
@@ -377,9 +386,8 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         return
     
     def prepare_model_evaluator(self):
-
-        self.model_evaluator = ModelEvaluator(self.model, self.data_loader, self.loss_func)
-
+        if self.data_loader is not None:
+            self.model_evaluator = ModelEvaluator(self.model, self.data_loader, self.loss_func)
         return
 
     def prepare_strategy(self):
@@ -445,8 +453,15 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         return
 
     def prepare_vocab(self):
-        if self.data_loader.task_type == "nlp":
-            if FedNodeVars.share_vocab is None:
+        # Determine task type
+        task_type = "image"
+        if self.data_loader is not None:
+            task_type = self.data_loader.task_type
+        elif "data_loader" in self.config_dict:
+            task_type = self.config_dict["data_loader"].get("task_type", "image")
+
+        if task_type == "nlp":
+            if FedNodeVars.share_vocab is None and self.data_loader is not None:
                 if hasattr(self.data_loader, "vocab") and self.data_loader.vocab is not None:
                     FedNodeVars.share_vocab = self.data_loader.vocab
                 else:
@@ -467,29 +482,38 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
 
     def prepare(self) -> Any:
         """
-        Prepare
+        Prepare components. In a simulated environment, clients skip redundant data loading
+        and server-only configurations.
         """
+        # Determine if this node acts as a server based on its configuration
+        is_server = "aggregation" in self.config_dict or "client_selection" in self.config_dict
         
-        console.info("Prepare vocab tokenizer...", "")
-        self.prepare_vocab_tokenizer()
-        console.ok("OK")
+        if is_server:
+            console.info("Prepare vocab tokenizer (Server)...", "")
+            self.prepare_vocab_tokenizer()
+            console.ok("OK")
 
-        console.info("Prepare data loader...", "")
-        self.prepare_data_loader()
-        self.prepare_vocab()
-        console.ok("OK")
+            console.info("Prepare data loader (Server)...", "")
+            self.prepare_data_loader()
+            self.prepare_vocab()
+            console.ok("OK")
 
-        console.info("Prepare data_distribution...", "")
-        self.prepare_data_distribution()
-        console.ok("OK")
+            console.info("Prepare data_distribution...", "")
+            self.prepare_data_distribution()
+            console.ok("OK")
 
-        console.info("Prepare data handler...", "")
-        self.prepare_data_handler()
-        console.ok("OK")
+            console.info("Prepare data handler...", "")
+            self.prepare_data_handler()
+            console.ok("OK")
+        else:
+            # For clients, we may still need vocab/tokenizer information if it's an NLP task
+            if "tokenizer" in self.config_dict:
+                self.prepare_vocab_tokenizer()
+                self.prepare_vocab()
 
         console.info("Prepare NN model...", "")
         self.prepare_model()
-        console.ok("OK") #TODO: continue
+        console.ok("OK")
 
         console.info("Prepare optimizer...", "")
         self.prepare_optimizer()
@@ -499,13 +523,14 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.prepare_loss_func()
         console.ok("OK")
 
-        console.info("Prepare client selection...", "")
-        self.prepare_client_selection()
-        console.ok("OK")
+        if is_server:
+            console.info("Prepare client selection...", "")
+            self.prepare_client_selection()
+            console.ok("OK")
 
-        console.info("Prepare aggregation...", "")
-        self.prepare_aggregation()
-        console.ok("OK")
+            console.info("Prepare aggregation...", "")
+            self.prepare_aggregation()
+            console.ok("OK")
         
         console.info("Prepare extractor...", "")
         self.prepare_extractor()
@@ -524,9 +549,10 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         self.prepare_trainer()
         console.ok("OK")
 
-        console.info("check global model for inference", "")
-        self.prepare_global_inference_model()
-        console.ok("OK")
+        if is_server:
+            console.info("check global model for inference", "")
+            self.prepare_global_inference_model()
+            console.ok("OK")
 
         console.info("Prepare completed.")
 
