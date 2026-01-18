@@ -1,4 +1,5 @@
 from torch import nn
+import torch.nn.functional as F
 import torch
 import math
 from .lora_ms import MSLoRALinear, MSLoRAConv2d
