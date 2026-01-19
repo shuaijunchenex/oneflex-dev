@@ -37,6 +37,12 @@ class FedClientSelectorFactory:
             case "pyramidfl":
                 from .methods._fed_client_selector_pyramidfl import FedClientSelector_PyramidFL
                 selector = FedClientSelector_PyramidFL(args)
+            case "afl":
+                from .methods._fed_client_selector_afl import FedClientSelector_AFL
+                selector = FedClientSelector_AFL(args)
+            case "powd":
+                from .methods._fed_client_selector_powd import FedClientSelector_Powd
+                selector = FedClientSelector_Powd(args)
             case _:
                 raise Exception(f"Fed client selector method '{args.select_method}' not found")        
 

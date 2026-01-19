@@ -1,5 +1,5 @@
 # yaml files path
-yaml_section_path: "./yamls/"
+yaml_section_path: "../../yamls/"
 
 # yaml files
 yaml_section_files: 

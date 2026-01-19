@@ -1,4 +1,0 @@
-trainer:
-  trainer_type: "standard"
-  deivce: "cpu"
-  save_path: "./.training_results/"

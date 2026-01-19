@@ -1,10 +1,10 @@
-yaml_section_path: ./yamls/
+yaml_section_path: ../../yamls/
 yaml_folder_aggreation_path: ../../yamls/aggregation/
 yaml_folder_client_selection_path: ../../yamls/client_selection/
 yaml_folder_dataset_loader_path: ../../yamls/dataset_loader/
-yaml_folder_distribution_path: ./yamls/data_distribution/
+yaml_folder_distribution_path: ../../yamls/data_distribution/
 yaml_folder_loss_func_path: ../../yamls/loss_func/
-yaml_folder_lora_path: ./yamls/lora/
+yaml_folder_lora_inference_path: ../../yamls/lora_inference/
 yaml_folder_nn_model_path: ../../yamls/nn_model/
 yaml_folder_fl_nodes_path: ../../yamls/fl_nodes/
 yaml_folder_optimizer_path: ../../yamls/optimizer/

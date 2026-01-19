@@ -14,35 +14,61 @@ yaml_folder_trainer_path: ../../yamls/trainer/
 yaml_folder_training_logger_path: ../../yamls/training_logger/
 yaml_folder_training_path: ../../yamls/training/
 yaml_folder_general_path: ../../yamls/general
+yaml_folder_role_path: ../../yamls/role/
 yaml_folder_rank_distribution_path: ../../yamls/rank_distribution
+yaml_folder_tokenizer_path: ../../yamls/tokenlizer/
 yaml_folder_aggreation_files:
 - aggregation_rbla.yaml: aggregation_rbla
 - aggregation_sp.yaml: aggregation_sp
+
 yaml_folder_client_selection_files:
 - random.yaml: client_selection_random
+
+yaml_folder_tokenizer_files:
+- basic_english.yaml: tokenizer_basic_english
+
+yaml_folder_role_files:
+- server.yaml: role_server
+- client.yaml: role_client
+
 yaml_folder_dataset_loader_files:
-- mnist.yaml: dataset_loader_mnist
+- dbpedia.yaml: dataset_loader_dbpedia
+
 yaml_folder_data_distribution_files:
 - mnist_one_label.yaml: mnist_one_label
-- cifar10_one_label.yaml: cifar10_one_label
+- imdb_base.yaml: imdb_base
+
 yaml_folder_loss_func_files:
 - cross_entropy.yaml: cross_entropy
+
 yaml_folder_nn_model_files:
 - nn_model_mnist_mlp_lora.yaml: nn_model_mnist_mlp_lora
 - nn_model_cifar10_vit_lora.yaml: nn_model_cifar10_vit
+- nn_model_imdb_transformer_lora.yaml: nn_model_imdb_transformer_lora
+- transformer_encoder.yaml: transformer_encoder
+- transformer_decoder.yaml: transformer_decoder
+- transformer_encode_decoder.yaml: transformer_encode_decoder
+- transformer_hybrid.yaml: transformer_hybrid
+- transformer_tiny_scratch.yaml: transformer_tiny_scratch
+
 yaml_folder_lora_inference_files:
 - base_lora_inference.yaml: base_lora_inference_mode
+
 yaml_folder_fl_nodes_files:
 - default_10_clients.yaml: fl_nodes
+- 2_clients.yaml: fl_nodes_2_clients
+
 yaml_folder_optimizer_files:
 - sgd.yaml: sgd
 - adam.yaml: adam
+
 yaml_folder_training_files:
 - training_epoch1.yaml: training_epoch1
 - training_epoch2.yaml: training_epoch2
 - training_epoch3.yaml: training_epoch3
 - training_epoch5.yaml: training_epoch5
 - training_epoch10.yaml: training_epoch10
+
 yaml_folder_client_strategy_files:
 - rbla.yaml: rbla_client_strategy
 - sp.yaml: sp_client_strategy
@@ -55,44 +81,54 @@ yaml_folder_runner_strategy_files:
 yaml_folder_trainer_files:
 - standard_trainer.yaml: trainer_standard
 - vit_trainer.yaml: trainer_vit
+- imdb_trainer.yaml: trainer_imdb
 yaml_folder_training_logger_files:
 - standard_training_logger.yaml: training_logger
 yaml_folder_general_files:
 - general_round30.yaml: general_round30
 - general_round60.yaml: general_round60
 - general_round100.yaml: general_round100
+- general_round150.yaml: general_round150
+- general_round300.yaml: general_round300
 yaml_folder_rank_distribution_files:
 - rank001.yaml: rank_distribution_001_homogeneous
 - rank002.yaml: rank_distribution_002_homogeneous
 yaml_combination:
+
   runner:
   - general_round100
   - training_logger
-  - fl_nodes
-  - rbla_runner_strategy
+  - fl_nodes_2_clients
+  - sp_runner_strategy
+
   client_yaml:
+  - role_client
   - training_logger
-  - dataset_loader_mnist
-  - nn_model_mnist_mlp_lora
+  - dataset_loader_dbpedia
+  - nn_model_imdb_transformer_lora
   - cross_entropy
   - sgd
   - training_epoch3
-  - mnist_one_label
-  - rbla_client_strategy
-  - trainer_standard
+  - sp_client_strategy
+  - trainer_imdb
+  - tokenizer_basic_english
+
   edge_yaml: []
+
   server_yaml:
+  - role_server
   - general_round100
   - training_logger
-  - dataset_loader_mnist
-  - nn_model_mnist_mlp_lora
+  - dataset_loader_dbpedia
+  - nn_model_imdb_transformer_lora
   - cross_entropy
   - sgd
   - training_epoch3
-  - mnist_one_label
-  - trainer_standard
+  - imdb_base
+  - trainer_imdb
+  - tokenizer_basic_english
   - client_selection_random
-  - rbla_server_strategy
-  - aggregation_rbla
+  - sp_server_strategy
+  - aggregation_sp
   - rank_distribution_001_homogeneous
   - base_lora_inference_mode
