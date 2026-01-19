@@ -43,6 +43,9 @@ class FedClientSelectorFactory:
             case "powd":
                 from .methods._fed_client_selector_powd import FedClientSelector_Powd
                 selector = FedClientSelector_Powd(args)
+            case "fedgra":
+                from .methods._fed_client_selector_fedgra import FedClientSelector_FedGRA
+                selector = FedClientSelector_FedGRA(args)
             case _:
                 raise Exception(f"Fed client selector method '{args.select_method}' not found")        
 
