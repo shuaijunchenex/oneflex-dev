@@ -85,6 +85,9 @@ class DatasetLoaderFactory:
             case "sst2":
                 from .loader._dataset_loader_sst2 import DatasetLoader_SST2
                 return DatasetLoader_SST2().create(data_loader_args, fn)
+            case "cola":
+                from .loader._dataset_loader_cola import DatasetLoader_CoLA
+                return DatasetLoader_CoLA().create(data_loader_args, fn)
             case "mrpc" | "mprc":
                 from .loader._dataset_loader_mrpc import DatasetLoader_MRPC
                 return DatasetLoader_MRPC().create(data_loader_args, fn)

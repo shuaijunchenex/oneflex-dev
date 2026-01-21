@@ -107,9 +107,17 @@ class FedAggregator_RBLA(AbstractFedAggregator):
 
     # ---------- Core RBLA ops ----------
     @staticmethod
-    def get_suffix(key: str) -> str:
-        """Return the suffix after the last dot."""
-        return key.rsplit(".", 1)[-1]
+    def get_lora_type(key: str, lora_suffixes: set[str]) -> str | None:
+        """
+        Check if key contains a LoRA suffix component (e.g. 'lora_A').
+        Returns the suffix if found (e.g. 'lora_A'), else None.
+        Compatible with HuggingFace PEFT keys like 'base_model.model...lora_A.default.weight'.
+        """
+        parts = key.split(".")
+        for suffix in lora_suffixes:
+            if suffix in parts:
+                return suffix
+        return None
 
     @staticmethod
     def pad_tensors_to_max_shape(tensors: list[torch.Tensor], pad_mode: str = "nan") -> torch.Tensor:
@@ -191,9 +199,9 @@ class FedAggregator_RBLA(AbstractFedAggregator):
 
         for key in keys:
             values = [sd[key] for sd in state_dicts]
-            suffix = FedAggregator_RBLA.get_suffix(key)
+            lora_type = FedAggregator_RBLA.get_lora_type(key, lora_suffixes)
 
-            if suffix in lora_suffixes:
+            if lora_type is not None:
                 aggregated[key] = FedAggregator_RBLA.aggregate_lora_tensors(values, weights, pad_mode=pad_mode)
             else:
                 stacked = torch.stack(values, dim=0)  # (N, ...)
@@ -213,17 +221,17 @@ class FedAggregator_RBLA(AbstractFedAggregator):
         new_local_sd = {}
         for key, local_tensor in local_sd.items():
             global_tensor = global_sd[key]
-            suffix = FedAggregator_RBLA.get_suffix(key)
+            lora_type = FedAggregator_RBLA.get_lora_type(key, lora_suffixes)
 
-            if suffix not in lora_suffixes:
+            if lora_type is None:
                 new_local_sd[key] = global_tensor.clone()
             else:
-                if suffix == "lora_A":       # [r, in]
+                if lora_type == "lora_A":       # [r, in]
                     r_local = local_tensor.shape[0]
                     new_local_sd[key] = global_tensor[:r_local, :].clone()
-                elif suffix == "lora_B":     # [out, r]
+                elif lora_type == "lora_B":     # [out, r]
                     r_local = local_tensor.shape[1]
                     new_local_sd[key] = global_tensor[:, :r_local].clone()
                 else:
-                    raise ValueError(f"Unrecognized LoRA suffix: {suffix}")
+                    raise ValueError(f"Unrecognized LoRA suffix: {lora_type}")
         return new_local_sd

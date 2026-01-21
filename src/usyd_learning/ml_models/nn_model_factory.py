@@ -64,6 +64,12 @@ class NNModelFactory:
             case "transformer_classification":
                 from .transformer.encoder_only._nn_model_transformer_classification import NNModel_TransformerClassification
                 return NNModel_TransformerClassification().create_model(args)
+            case "tiny_bert" | "bert_tiny":
+                # Alias for a small transformer-based classifier using prajjwal1/bert-tiny
+                if not getattr(args, "pretrained_model", None):
+                    args.pretrained_model = "prajjwal1/bert-tiny"
+                from .transformer.encoder_only._nn_model_transformer_classification import NNModel_TransformerClassification
+                return NNModel_TransformerClassification().create_model(args)
             case "transformer_decoder_classification":
                 from .transformer.decoder_only._nn_model_decoder_only_classification import NNModel_DecoderOnlyClassification
                 return NNModel_DecoderOnlyClassification().create_model(args)

@@ -292,10 +292,10 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
         else:
             config = self.config_dict
 
-        name = config["name"]
+        name = config.get("name")
 
         if String.is_none_or_empty(name):
-            raise ValueError("Error: Missing model name in yaml.")
+            raise ValueError("Error: Missing model type in yaml.")
         
         if self.config_dict["data_loader"]["task_type"] != "nlp":
             is_share_model = config.get("share_model", True)  # NOTICE: Share model

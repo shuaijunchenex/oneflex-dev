@@ -71,16 +71,44 @@ class TokenizerBuilder(Handlers):
 
     @staticmethod
     def build_vocab(data_set, tokenizer, min_freq=2, max_vocab=30000):
+        """Build a vocab from an iterable dataset.
+
+        Compatible with torchtext datasets that may yield tuples of varying length
+        (e.g., CoLA can yield (line_idx, label, text) depending on version).
+        We only care about the text field, assumed to be the last element if a tuple/list,
+        or the value of 'text'/'sentence' if a dict.
+        """
         from collections import Counter
         from torchtext.vocab import Vocab
         
-        train_pairs = list(data_set)
+        train_samples = list(data_set)
+
+        def _extract_text(sample):
+            # Dict sample
+            if isinstance(sample, dict):
+                for key in ("text", "sentence", "content"):
+                    if key in sample:
+                        return sample[key]
+                # fallback: first value
+                return next(iter(sample.values()))
+            # Tuple/list sample
+            if isinstance(sample, (list, tuple)):
+                if len(sample) == 0:
+                    return ""
+                # Assume last element is text
+                return sample[-1]
+            # String sample
+            if isinstance(sample, str):
+                return sample
+            # Unknown structure
+            return str(sample)
 
         PAD, CLS, UNK = "<pad>", "<cls>", "<unk>"
         specials = [PAD, CLS, UNK]
         counter = Counter()
 
-        for _, text in train_pairs:
+        for sample in train_samples:
+            text = _extract_text(sample)
             counter.update(tokenizer(text))
 
         cutoff = max_vocab - len(specials)
@@ -88,7 +116,8 @@ class TokenizerBuilder(Handlers):
         counter = Counter(dict(most_common))
 
         def yield_tokens():
-            for _, text in train_pairs:
+            for sample in train_samples:
+                text = _extract_text(sample)
                 yield tokenizer(text)
 
         vocab = build_vocab_from_iterator(

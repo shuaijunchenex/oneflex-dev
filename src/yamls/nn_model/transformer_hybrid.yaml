@@ -2,7 +2,7 @@
 # Hybrid Conv + Transformer Model
 #-----------------------------
 nn_model:
-  type: transformer_hybrid_imdb
+  name: transformer_hybrid_imdb
   vocab_size: 30000
   embed_dim: 128
   num_heads: 4
