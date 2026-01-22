@@ -69,10 +69,17 @@ class DatasetLoaderUtil:
 
         input_ids = torch.tensor(padded, dtype=torch.long)
         
-        if labels and isinstance(labels[0], str):
-            label_map = {l: i for i, l in enumerate(sorted(set(labels)))}
-            labels = [label_map[l] for l in labels]
-            
+        # Normalize labels: strings -> ids, integers -> zero-based contiguous ids
+        unique_labels = sorted(set(labels)) if labels else []
+        if labels:
+            if isinstance(labels[0], str):
+                label_map = {l: i for i, l in enumerate(unique_labels)}
+                labels = [label_map[l] for l in labels]
+            else:
+                # integer-like labels; remap to [0..K-1] to avoid out-of-bounds
+                label_map = {l: i for i, l in enumerate(unique_labels)}
+                labels = [label_map[l] for l in labels]
+        
         labels = torch.tensor(labels, dtype=torch.long)
 
         return input_ids, labels

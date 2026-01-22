@@ -19,7 +19,7 @@ yaml_folder_rank_distribution_path: ../../yamls/rank_distribution
 yaml_folder_tokenizer_path: ../../yamls/tokenlizer/
 yaml_folder_aggreation_files:
 - aggregation_rbla.yaml: aggregation_rbla
-- aggregation_sp.yaml: aggregation_sp
+- aggregation_fedavg.yaml: aggregation_fedavg
 
 yaml_folder_client_selection_files:
 - random.yaml: client_selection_random
@@ -70,12 +70,15 @@ yaml_folder_training_files:
 - training_epoch10.yaml: training_epoch10
 
 yaml_folder_client_strategy_files:
+- fedavg.yaml: fedavg_client_strategy
 - rbla.yaml: rbla_client_strategy
 - sp.yaml: sp_client_strategy
 yaml_folder_server_strategy_files:
+- fedavg.yaml: fedavg_server_strategy
 - rbla.yaml: rbla_server_strategy
 - sp.yaml: sp_server_strategy
 yaml_folder_runner_strategy_files:
+- fedavg.yaml: fedavg_runner_strategy
 - rbla.yaml: rbla_runner_strategy
 - sp.yaml: sp_runner_strategy
 yaml_folder_trainer_files:
@@ -99,7 +102,7 @@ yaml_combination:
   - general_round100
   - training_logger
   - fl_nodes_2_clients
-  - sp_runner_strategy
+  - fedavg_runner_strategy
 
   client_yaml:
   - role_client
@@ -109,7 +112,7 @@ yaml_combination:
   - cross_entropy
   - sgd
   - training_epoch3
-  - sp_client_strategy
+  - fedavg_client_strategy
   - trainer_imdb
   - tokenizer_basic_english
   - cola_2clients
@@ -129,8 +132,8 @@ yaml_combination:
   - trainer_imdb
   - tokenizer_basic_english
   - client_selection_random
-  - sp_server_strategy
-  - aggregation_sp
+  - fedavg_server_strategy
+  - aggregation_fedavg
   - rank_distribution_001_homogeneous
   - base_lora_inference_mode
 

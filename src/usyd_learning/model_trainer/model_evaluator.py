@@ -41,12 +41,39 @@ class ModelEvaluator:
         total_loss, total_samples = 0.0, 0
 
         with torch.inference_mode():
-            # 如果 val_loader 就是 DataLoader：
             for inputs, labels in getattr(self.val_loader, "test_data_loader", self.val_loader):
                 inputs = inputs.to(self.device, non_blocking=True)
                 labels = labels.to(self.device).long()
 
                 outputs = self.model(inputs)
+
+                print(f"=== 标签调试信息 ===")
+                print(f"标签形状: {labels.shape}")
+                print(f"标签原始值: {labels.tolist()}")
+                print(f"标签范围: [{labels.min().item()}, {labels.max().item()}]")
+                print(f"唯一标签值: {torch.unique(labels).tolist()}")
+                # 定位异常标签的位置
+                abnormal_indices = torch.where((labels < 0) | (labels > 1))[0]
+                if len(abnormal_indices) > 0:
+                    print(f"异常标签位置: {abnormal_indices.tolist()}")
+                    print(f"异常标签值: {labels[abnormal_indices].tolist()}")
+                print("====================\n")
+
+                # Guard: remap labels to valid range [0, num_classes-1]
+                num_classes = outputs.shape[1] if outputs.dim() > 1 else 1
+                uniq = torch.unique(labels)
+                if uniq.numel() > 0:
+                    # Build contiguous mapping
+                    label_map = {int(l): i for i, l in enumerate(sorted(uniq.tolist()))}
+                    remapped = torch.tensor([label_map[int(l)] for l in labels.tolist()], device=self.device)
+                    if remapped.max().item() >= num_classes or len(label_map) > num_classes:
+                        from ..ml_utils import console
+                        console.warn(
+                            f"Label values {uniq.tolist()} exceed model classes ({num_classes}); remapping and clipping."
+                        )
+                        remapped = torch.clamp(remapped, max=num_classes - 1)
+                    labels = remapped
+
                 loss = self.criterion(outputs, labels)
                 total_loss += loss.item() * inputs.size(0)
                 total_samples += inputs.size(0)
