@@ -12,7 +12,13 @@ class DatasetLoaderUtil:
     def text_collate_fn(batch, tokenizer=None, vocab=None, max_len=256, pad_id=0):
         """
         Collate function for text datasets.
-        Converts list of (label, text) into (padded_input_ids, labels).
+                Converts list of samples into (padded_input_ids, labels).
+                Supports samples shaped as:
+                    - (label, text)
+                    - (idx, label, text)
+                    - dict with keys like {'label': ..., 'text': ...}
+                Text is taken as the last element for tuple/list, or the 'text' field for dict.
+                Label is taken as the first element, or the 'label' field for dict.
 
         Args:
             batch: list of (label, text) pairs
@@ -28,7 +34,24 @@ class DatasetLoaderUtil:
         if tokenizer is None or vocab is None:
             raise ValueError("text_collate_fn requires tokenizer and vocab.")
 
-        labels, texts = zip(*batch)
+        def _extract_label_text(sample):
+            # Dict sample
+            if isinstance(sample, dict):
+                label = sample.get("label", sample.get("labels"))
+                text = sample.get("text", sample.get("sentence", sample.get("content")))
+                return label, text
+            # Tuple/list sample
+            if isinstance(sample, (list, tuple)):
+                if len(sample) == 0:
+                    return None, ""
+                label = sample[0]
+                text = sample[-1]
+                return label, text
+            # Otherwise treat as text-only
+            return None, sample
+
+        labels_texts = [ _extract_label_text(s) for s in batch ]
+        labels, texts = zip(*labels_texts)
 
         # tokenize + map to ids
         tokenized = [tokenizer(t) for t in texts]

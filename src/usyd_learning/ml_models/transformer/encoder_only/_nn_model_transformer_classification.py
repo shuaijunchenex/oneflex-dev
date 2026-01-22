@@ -27,7 +27,8 @@ class NNModel_TransformerClassification(NNModel):
         
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name,
-            config=config
+            config=config,
+            use_safetensors=True,
         )
         
         self.pad_id = getattr(args, "pad_id", 0)
