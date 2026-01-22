@@ -57,7 +57,9 @@ class StandardSampleEntry(AppEntry):
         train_loader = server_var.data_loader
 
         # NonIID handler
-        allocated_noniid_data = NoniidDataGenerator(train_loader.data_loader).generate_noniid_data(distribution=self.server_yaml["data_distribution"]["use"])
+        allocated_noniid_data = NoniidDataGenerator(train_loader.data_loader).generate_noniid_data(
+            distribution_config=self.server_yaml["data_distribution"]
+        )
 
         for i in range(len(allocated_noniid_data)):
             args = DatasetLoaderArgs({'name': 'custom', 

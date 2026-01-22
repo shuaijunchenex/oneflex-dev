@@ -25,9 +25,11 @@ class NoniidDataLoader(DatasetLoader):
         )
 
         generator = NoniidDataGenerator(base_loader)
+        extra = args.extra or {}
         self._client_loaders = generator.generate_noniid_data(
-            distribution=args.extra.get("distribution", "mnist_lt"),
-            data_volum_list=args.extra.get("data_volum_list"),
+            distribution=extra.get("distribution", "mnist_lt"),
+            distribution_config=extra.get("distribution_config"),
+            data_volum_list=extra.get("data_volum_list"),
             batch_size=args.batch_size,
             shuffle=args.shuffle,
             num_workers=args.num_workers

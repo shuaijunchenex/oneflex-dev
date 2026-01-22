@@ -35,8 +35,7 @@ yaml_folder_dataset_loader_files:
 - cola.yaml: dataset_loader_cola
 
 yaml_folder_data_distribution_files:
-- mnist_one_label.yaml: mnist_one_label
-- imdb_base.yaml: imdb_base
+- cola_2clients.yaml: cola_2clients
 
 yaml_folder_loss_func_files:
 - cross_entropy.yaml: cross_entropy
@@ -113,6 +112,7 @@ yaml_combination:
   - sp_client_strategy
   - trainer_imdb
   - tokenizer_basic_english
+  - cola_2clients
 
   edge_yaml: []
 
@@ -125,7 +125,7 @@ yaml_combination:
   - cross_entropy
   - sgd
   - training_epoch3
-  - imdb_base
+  - cola_2clients
   - trainer_imdb
   - tokenizer_basic_english
   - client_selection_random

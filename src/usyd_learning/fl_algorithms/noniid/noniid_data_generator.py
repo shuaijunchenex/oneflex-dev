@@ -72,7 +72,21 @@ class NoniidDataGenerator:
 
         # Merge X (data)
         if len(data_list) > 0 and torch.is_tensor(data_list[0]):
-            self.x_train = torch.cat(data_list, dim=0)
+            # If sequence lengths differ across batches (common in NLP), pad to max length first
+            shapes = [tuple(t.shape) for t in data_list]
+            if len(set(shapes)) == 1:
+                self.x_train = torch.cat(data_list, dim=0)
+            else:
+                # Handle 2D tensors shaped [B, L]; pad to max L
+                max_len = max(s[1] for s in shapes if len(s) >= 2)
+                padded_list = []
+                for t in data_list:
+                    if t.dim() == 2 and t.shape[1] < max_len:
+                        pad_len = max_len - t.shape[1]
+                        # pad on the right: (pad_right, pad_left) order per dimension
+                        t = torch.nn.functional.pad(t, (0, pad_len), value=0)
+                    padded_list.append(t)
+                self.x_train = torch.cat(padded_list, dim=0)
         else:
             # Text task: merge into a single large list or object
             self.x_train = []
@@ -236,17 +250,29 @@ class NoniidDataGenerator:
         else:
             raise ValueError("Invalid distribution type. Choose 'mnist_lt' or 'custom'.")
 
-    def generate_noniid_data(self, data_volum_list=None, verify_allocate=True, distribution="mnist_lt", batch_size=64, shuffle=False, num_workers=0):
+    def generate_noniid_data(
+        self,
+        data_volum_list=None,
+        verify_allocate=True,
+        distribution="mnist_lt",
+        batch_size=64,
+        shuffle=False,
+        num_workers=0,
+        distribution_config: dict | None = None,
+    ):
         """
         Distributes imbalanced data to different clients based on predefined patterns and returns a list of DataLoader for each client.
 
         Args:
-            data_volum_list (list): A list containing data volume for different classes (used only if distribution="custom").
+            data_volum_list (list): Custom distribution matrix (used if distribution="custom").
             verify_allocate (bool): Whether to print allocation results.
-            distribution (str): Default is "mnist_lt", supports different distributions.
+            distribution (str): Default "mnist_lt"; overridden by distribution_config if provided.
             batch_size (int): Number of samples per batch for the DataLoader.
             shuffle (bool): Whether to shuffle the data in the DataLoader.
             num_workers (int): Number of worker threads for the DataLoader.
+            distribution_config (dict|None): Full config dict from YAML `data_distribution` section. If provided,
+                - uses `distribution_config.get("use")` to override distribution name
+                - if `use == "custom"`, pulls matrix from `distribution_config["custom_define"]["custom"]` (or `data_volum_list`)
 
         Returns:
             list: A list of DataLoader objects, each corresponding to one client's data.
@@ -254,6 +280,18 @@ class NoniidDataGenerator:
         # Ensure data_pool is initialized
         if self.data_pool is None:
             raise ValueError("Data pool is not created. Call create_data_pool() first.")
+
+        # If full config is provided, override distribution + custom matrix
+        if distribution_config is not None:
+            dist_name = distribution_config.get("use", distribution)
+            distribution = dist_name
+            if dist_name == "custom":
+                custom = None
+                if isinstance(distribution_config.get("custom_define"), dict):
+                    custom = distribution_config.get("custom_define", {}).get("custom")
+                # fallback to explicit argument if present
+                if custom is not None:
+                    data_volum_list = custom
 
         # Always use the provided distribution matrix (predefined or custom).
         distribution_pattern = self.distribution_generator(distribution, data_volum_list)
@@ -282,11 +320,16 @@ class NoniidDataGenerator:
                         raise ValueError(
                             f"Label {label_val} (from matrix index {col_idx}) not in data pool. Available: {self.labels_sorted}"
                         )
-                    if num_samples > len(pool):
-                        raise ValueError(
-                            f"Not enough samples for class {label_val}: requested {num_samples}, available {len(pool)}"
+                    available = len(pool)
+                    if num_samples > available:
+                        from ...ml_utils import console
+                        console.warn(
+                            f"Not enough samples for class {label_val}: requested {num_samples}, available {available}; capping to {available}"
                         )
-                    
+                        num_samples = available
+                    if num_samples == 0:
+                        continue
+
                     # Select and remove data from pool
                     selected_data = pool[:num_samples]
                     client_images.extend(selected_data)
