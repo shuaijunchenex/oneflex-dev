@@ -1,4 +1,4 @@
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, matthews_corrcoef
 
 import torch
 import torch.nn as nn
@@ -47,18 +47,6 @@ class ModelEvaluator:
 
                 outputs = self.model(inputs)
 
-                print(f"=== 标签调试信息 ===")
-                print(f"标签形状: {labels.shape}")
-                print(f"标签原始值: {labels.tolist()}")
-                print(f"标签范围: [{labels.min().item()}, {labels.max().item()}]")
-                print(f"唯一标签值: {torch.unique(labels).tolist()}")
-                # 定位异常标签的位置
-                abnormal_indices = torch.where((labels < 0) | (labels > 1))[0]
-                if len(abnormal_indices) > 0:
-                    print(f"异常标签位置: {abnormal_indices.tolist()}")
-                    print(f"异常标签值: {labels[abnormal_indices].tolist()}")
-                print("====================\n")
-
                 # Guard: remap labels to valid range [0, num_classes-1]
                 num_classes = outputs.shape[1] if outputs.dim() > 1 else 1
                 uniq = torch.unique(labels)
@@ -90,6 +78,7 @@ class ModelEvaluator:
             "precision": precision_score(all_labels, all_preds, average=average, zero_division=0),
             "recall": recall_score(all_labels, all_preds, average=average, zero_division=0),
             "f1_score": f1_score(all_labels, all_preds, average=average, zero_division=0),
+            "mcc": matthews_corrcoef(all_labels, all_preds),
             "total_test_samples": total_samples,
         }
         return self.latest_metrics
@@ -110,6 +99,7 @@ class ModelEvaluator:
         console.info(f"  - Precision: {self.latest_metrics['precision']:.4f}")
         console.info(f"  - Recall   : {self.latest_metrics['recall']:.4f}")
         console.info(f"  - F1-Score : {self.latest_metrics['f1_score']:.4f}")
+        console.info(f"  - MCC      : {self.latest_metrics.get('mcc', 0.0):.4f}")
         console.info(f"  - Samples  : {self.latest_metrics['total_test_samples']}")
         return
 

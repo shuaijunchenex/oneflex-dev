@@ -9,6 +9,7 @@ from usyd_learning.ml_utils import console
 from usyd_learning.ml_utils.model_ewma import ModelEWMA
 from usyd_learning.ml_utils.model_utils import ModelUtils
 from usyd_learning.model_trainer import ModelTrainer
+from usyd_learning.ml_utils.metric_calculator import MetricCalculator
 
 
 class ModelTrainer_Vit(ModelTrainer):
@@ -46,6 +47,8 @@ class ModelTrainer_Vit(ModelTrainer):
         if self.trainer_args.ema_decay!=None and self.trainer_args.ema_decay>0:
             self._ewma = ModelEWMA(self.trainer_args.model, decay=self.trainer_args.ema_decay, device=self.device)
 
+        self.metrics = MetricCalculator()
+
         return
 
     def set_model(self, model: nn.Module):
@@ -58,7 +61,7 @@ class ModelTrainer_Vit(ModelTrainer):
             self._ewma = self._build_ewma_if_needed(force_rebuild=True)
         return self
 
-    def train_step(self) -> float:
+    def train_step(self) -> Dict[str, Any]:
         ta = self.trainer_args
         if ta.optimizer is None:
             raise ValueError("Trainer optimizer is None.")
@@ -80,11 +83,11 @@ class ModelTrainer_Vit(ModelTrainer):
         ta.model.train()
         ta.optimizer.zero_grad(set_to_none=True)
 
+        self.metrics.reset()
+
         # 累计器
         grad_accum_steps: int = getattr(ta, "grad_accum_steps", getattr(ta, "accumulation_steps", 1))
         clip_grad_norm: float = float(getattr(ta, "clip_grad_norm", 0.0))
-
-        running_loss, total_batch = 0.0, 0
 
         from tqdm.auto import tqdm
         loop = tqdm(
@@ -95,22 +98,26 @@ class ModelTrainer_Vit(ModelTrainer):
         )
 
         for inputs, labels in loop:
-            total_batch += 1
             inputs = inputs.to(ta.device, non_blocking=True)
             labels = labels.to(ta.device, non_blocking=True)
+
+            try:
+                batch_size = int(inputs.size(0))
+            except Exception:
+                batch_size = int(labels.size(0))
 
             with self._autocast_context():
                 outputs = ta.model(inputs)
                 loss = ta.loss_func(outputs, labels)
-                loss = loss / max(1, grad_accum_steps)
+                loss_scaled = loss / max(1, grad_accum_steps)
 
             # 反向：CUDA 使用 scaler，其他直接 backward
             if self._scaler is not None:
-                self._scaler.scale(loss).backward()
+                self._scaler.scale(loss_scaled).backward()
             else:
-                loss.backward()
+                loss_scaled.backward()
 
-            if total_batch % grad_accum_steps == 0:
+            if self.metrics.total_batch + 1 % grad_accum_steps == 0:
                 # 梯度裁剪
                 if clip_grad_norm > 0:
                     if self._scaler is not None:
@@ -132,23 +139,24 @@ class ModelTrainer_Vit(ModelTrainer):
             # EMA（每步）
             self._update_ewma()
 
-            running_loss += float(loss.item()) * max(1, grad_accum_steps)
+            loss_scalar = float(loss.item())
+            self.metrics.update(loss_scalar, batch_size)
 
             loop.set_postfix(
-                batch=total_batch,
-                loss=f"{loss.item():.4f}",
-                avg_loss=f"{running_loss/total_batch:.4f}",
+                batch=self.metrics.total_batch,
+                loss=f"{loss_scalar:.4f}",
+                avg_loss=f"{self.metrics.avg_loss:.4f}",
+                avg_loss_keras=f"{self.metrics.keras_loss:.4f}",
                 lr=ta.optimizer.param_groups[0]["lr"]
             )
-
-        avg_loss = running_loss / max(total_batch, 1)
 
         from tqdm.auto import tqdm as _tqdm
         _tqdm.write(
             f"[Epoch {self._epoch_idx}{'/' + str(total_epochs) if total_epochs else ''} Finished] "
-            f"avg_loss={avg_loss:.6f} | batches={total_batch} | device={ta.device}"
+            f"avg_loss={self.metrics.avg_loss:.6f} | keras_loss={self.metrics.keras_loss:.6f} | "
+            f"batches={self.metrics.total_batch} | samples={self.metrics.total_samples} | device={ta.device}"
         )
-        return avg_loss
+        return self.metrics.get_stats()
 
     def train(self, epochs, is_return_wbab=False) -> Any:
         self.trainer_args.total_epochs = epochs

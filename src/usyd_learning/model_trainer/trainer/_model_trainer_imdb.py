@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.cuda.amp import GradScaler  # 仅在 CUDA + AMP 时实际启用
 from usyd_learning.ml_utils.model_utils import ModelUtils
 from usyd_learning.model_trainer import ModelTrainer, ModelTrainerArgs
+from usyd_learning.ml_utils.metric_calculator import MetricCalculator
 
 # 你已提供：
 # from usyd_learning.ml_utils.training_utils import TrainingUtils   # 含 make_autocast
@@ -50,6 +51,8 @@ class ModelTrainer_Imdb(ModelTrainer):
         if isinstance(ema_decay, (float, int)) and 0.0 < float(ema_decay) < 1.0:
             self._ema = ModelEWMA(self.model, decay=float(ema_decay), device=self.device)
 
+        self.metrics = MetricCalculator()
+
         # 确保模型在目标设备
         if str(next(self.model.parameters()).device) != str(self.trainer_args.device):
             self.model = self.model.to(self.trainer_args.device)
@@ -68,7 +71,7 @@ class ModelTrainer_Imdb(ModelTrainer):
         self.trainer_args.model.train()
         return contextlib.nullcontext()
 
-    def train_step(self) -> float:
+    def train_step(self) -> Dict[str, Any]:
         ta = self.trainer_args
         if ta.optimizer is None:
             raise ValueError("Trainer optimizer is None.")
@@ -86,7 +89,7 @@ class ModelTrainer_Imdb(ModelTrainer):
         total_epochs = getattr(ta, "total_epochs", getattr(ta, "epochs", None))
 
         ta.model.to(self.device)
-        running_loss, total_batch = 0.0, 0
+        self.metrics.reset()
 
         from tqdm.auto import tqdm
         loop = tqdm(
@@ -99,9 +102,13 @@ class ModelTrainer_Imdb(ModelTrainer):
         # 训练模式上下文
         with self._ctx_model_train():
             for inputs, labels in loop:
-                total_batch += 1
                 inputs = inputs.to(ta.device)
                 labels = labels.to(ta.device)
+
+                try:
+                    batch_size = int(inputs.size(0))
+                except Exception:
+                    batch_size = int(labels.size(0))
 
                 ta.optimizer.zero_grad(set_to_none=True)
 
@@ -123,38 +130,66 @@ class ModelTrainer_Imdb(ModelTrainer):
                 if self._ema is not None:
                     self._ema.update(ta.model)
 
-                running_loss += float(loss.detach().item())
+                loss_scalar = float(loss.detach().item())
+                self.metrics.update(loss_scalar, batch_size)
+
                 loop.set_postfix(
-                    batch=total_batch,
-                    loss=f"{float(loss):.4f}",
-                    avg_loss=f"{running_loss/total_batch:.4f}",
+                    batch=self.metrics.total_batch,
+                    loss=f"{loss_scalar:.4f}",
+                    avg_loss=f"{self.metrics.avg_loss:.4f}",
+                    avg_loss_keras=f"{self.metrics.keras_loss:.4f}",
                     lr=ta.optimizer.param_groups[0]["lr"]
                 )
-
-        avg_loss = running_loss / max(total_batch, 1)
 
         from tqdm.auto import tqdm as _tqdm
         _tqdm.write(
             f"[Epoch {self._epoch_idx}{'/' + str(total_epochs) if total_epochs else ''} Finished] "
-            f"avg_loss={avg_loss:.6f} | batches={total_batch} | device={ta.device}"
+            f"avg_loss={self.metrics.avg_loss:.6f} | keras_loss={self.metrics.keras_loss:.6f} | "
+            f"batches={self.metrics.total_batch} | samples={self.metrics.total_samples} | device={ta.device}"
         )
-        return avg_loss
+        return self.metrics.get_stats()
 
     def train(self, epochs, is_return_wbab=False) -> Any:
         self.trainer_args.total_epochs = epochs
         self._epoch_idx = 0
 
-        stats = {"train_loss_sum": 0, "epoch_loss": [], "train_loss_power_two_sum": 0}
+        stats: Dict[str, Any] = {
+            "train_loss_sum": 0.0,
+            "train_loss_power_two_sum": 0.0,
+            "epoch_loss": [],
+            "keras_train_loss_sum": 0.0,
+            "keras_train_loss_power_two_sum": 0.0,
+            "keras_epoch_loss": [],
+            "num_batches_sum": 0,
+            "num_samples_sum": 0,
+        }
+
         for _ in range(epochs):
             self._epoch_idx += 1
-            loss = self.train_step()
-            stats["train_loss_sum"] += loss
-            stats["train_loss_power_two_sum"] += loss ** 2
-            stats["epoch_loss"].append(loss)
+            step_out = self.train_step()
+            avg_loss = float(step_out["avg_loss"])
+            keras_loss = float(step_out["keras_loss"])
+
+            num_batches = int(step_out.get("num_batches", 0))
+            num_samples = int(step_out.get("num_samples", 0))
+
+            stats["train_loss_sum"] += avg_loss
+            stats["train_loss_power_two_sum"] += avg_loss ** 2
+            stats["epoch_loss"].append(avg_loss)
+
+            stats["keras_train_loss_sum"] += keras_loss
+            stats["keras_train_loss_power_two_sum"] += keras_loss ** 2
+            stats["keras_epoch_loss"].append(keras_loss)
+
+            stats["num_batches_sum"] += num_batches
+            stats["num_samples_sum"] += num_samples
 
         self._epoch_idx = 0
         stats["avg_loss"] = stats["train_loss_sum"] / max(epochs, 1)
+        stats["keras_avg_loss"] = stats["keras_train_loss_sum"] / max(epochs, 1)
+
         stats["sqrt_train_loss_power_two_sum"] = math.sqrt(stats["train_loss_power_two_sum"])
+        stats["keras_sqrt_train_loss_power_two_sum"] = math.sqrt(stats["keras_train_loss_power_two_sum"])
 
         return self.trainer_args.model.state_dict(), stats
 
@@ -163,7 +198,8 @@ class ModelTrainer_Imdb(ModelTrainer):
         stats = {"train_loss_sum": 0, "epoch_loss": [], "train_loss_power_two_sum": 0}
 
         for _ in range(epochs):
-            loss = self.train_step()
+            step_out = self.train_step()
+            loss = float(step_out["avg_loss"])
             stats["train_loss_sum"] += loss
             stats["train_loss_power_two_sum"] += loss ** 2
             stats["epoch_loss"].append(loss)
