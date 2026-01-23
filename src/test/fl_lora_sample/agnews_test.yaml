@@ -19,7 +19,7 @@ yaml_folder_rank_distribution_path: ../../yamls/rank_distribution
 yaml_folder_tokenizer_path: ../../yamls/tokenlizer/
 yaml_folder_aggreation_files:
 - aggregation_rbla.yaml: aggregation_rbla
-- aggregation_sp.yaml: aggregation_sp
+- aggregation_fedavg.yaml: aggregation_fedavg
 
 yaml_folder_client_selection_files:
 - random.yaml: client_selection_random
@@ -50,6 +50,7 @@ yaml_folder_nn_model_files:
 - transformer_encode_decoder.yaml: transformer_encode_decoder
 - transformer_hybrid.yaml: transformer_hybrid
 - transformer_tiny_scratch.yaml: transformer_tiny_scratch
+- transformer_tinybert.yaml: transformer_tinybert
 
 yaml_folder_lora_inference_files:
 - base_lora_inference.yaml: base_lora_inference_mode
@@ -72,12 +73,15 @@ yaml_folder_training_files:
 yaml_folder_client_strategy_files:
 - rbla.yaml: rbla_client_strategy
 - sp.yaml: sp_client_strategy
+- fedavg.yaml: fedavg_client_strategy
 yaml_folder_server_strategy_files:
 - rbla.yaml: rbla_server_strategy
 - sp.yaml: sp_server_strategy
+- fedavg.yaml: fedavg_server_strategy
 yaml_folder_runner_strategy_files:
 - rbla.yaml: rbla_runner_strategy
 - sp.yaml: sp_runner_strategy
+- fedavg.yaml: fedavg_runner_strategy
 yaml_folder_trainer_files:
 - standard_trainer.yaml: trainer_standard
 - vit_trainer.yaml: trainer_vit
@@ -99,17 +103,17 @@ yaml_combination:
   - general_round100
   - training_logger
   - fl_nodes_2_clients
-  - sp_runner_strategy
+  - fedavg_runner_strategy
 
   client_yaml:
   - role_client
   - training_logger
   - dataset_loader_agnews
-  - nn_model_imdb_transformer_lora
+  - transformer_tinybert
   - cross_entropy
   - sgd
   - training_epoch3
-  - sp_client_strategy
+  - fedavg_client_strategy
   - trainer_imdb
   - tokenizer_basic_english
 
@@ -120,7 +124,7 @@ yaml_combination:
   - general_round100
   - training_logger
   - dataset_loader_agnews
-  - nn_model_imdb_transformer_lora
+  - transformer_tinybert
   - cross_entropy
   - sgd
   - training_epoch3
@@ -128,7 +132,7 @@ yaml_combination:
   - trainer_imdb
   - tokenizer_basic_english
   - client_selection_random
-  - sp_server_strategy
-  - aggregation_sp
+  - fedavg_server_strategy
+  - aggregation_fedavg
   - rank_distribution_001_homogeneous
   - base_lora_inference_mode

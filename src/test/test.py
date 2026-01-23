@@ -16,7 +16,7 @@ g_app = StandardSampleEntry()
 
 def main():
     # Load app config set from yaml file
-    g_app.load_app_config("./fl_lora_sample/cola_test.yaml")
+    g_app.load_app_config("./fl_lora_sample/agnews_test.yaml")
 
     # Get training rounds
     training_rounds = g_app.training_rounds

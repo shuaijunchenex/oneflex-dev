@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from ..dataset_loader import DatasetLoader
-from ..dataset_loader_args import DatasetLoaderArgs
-from ..dataset_loader_util import DatasetLoaderUtil
-
-import torch
+from functools import partial
 from torch.utils.data import DataLoader
 from torchtext.datasets import AG_NEWS
 
+from ..dataset_loader import DatasetLoader
+from ..dataset_loader_args import DatasetLoaderArgs
+from ..dataset_loader_util import DatasetLoaderUtil
+from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
+
 """
-Dataset loader for agnews
+Dataset loader for AG_NEWS (train/test splits)
 """
 
 
@@ -19,12 +20,57 @@ class DatasetLoader_Agnews(DatasetLoader):
 
     # override
     def _create_inner(self, args: DatasetLoaderArgs) -> None:
-        self._dataset = AG_NEWS(root=args.root, split=args.split)
+        root = getattr(args, "root")
+        is_download = getattr(args, "is_download", True)
+        batch_size = getattr(args, "batch_size", 32)
+        test_batch_size = getattr(args, "test_batch_size", None) or batch_size
+        shuffle = getattr(args, "shuffle", True)
+        num_workers = getattr(args, "num_workers", 0)
+        train_split = getattr(args, "train_split", "train") or getattr(args, "split", "train")
+        test_split = getattr(args, "test_split", "test")
+
+        if is_download:
+            try:
+                _ = AG_NEWS(root=root, split=train_split)
+            except Exception:
+                pass
+
+        self._dataset = AG_NEWS(root=root, split=train_split)
+        self._test_dataset = AG_NEWS(root=root, split=test_split)
+
+        tokenizer = getattr(args, "tokenizer")
+        self.vocab = getattr(args, "vocab", None)
+        if self.vocab is None:
+            self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
+
+        args.vocab_size = len(self.vocab)
+
+        collate = partial(
+            DatasetLoaderUtil.text_collate_fn,
+            tokenizer=tokenizer,
+            vocab=self.vocab,
+        )
+
         self._data_loader = DataLoader(
             self._dataset,
-            batch_size=args.batch_size,
-            shuffle=args.shuffle,
-            num_workers=args.num_workers,
-            collate_fn=args.text_collate_fn)
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            collate_fn=collate,
+        )
+
+        self.task_type = "nlp"
+        try:
+            self.data_sample_num = len(self._dataset)
+        except Exception:
+            self.data_sample_num = None
+
+        self._test_data_loader = DataLoader(
+            self._test_dataset,
+            batch_size=test_batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            collate_fn=collate,
+        )
 
         return

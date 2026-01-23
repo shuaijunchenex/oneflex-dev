@@ -4,7 +4,7 @@
 data_loader:
   name: agnews
   root: "../../../.dataset"
-  split: ""
+  split: "train"
   batch_size: 64
   shuffle: True
   num_workers: 0
