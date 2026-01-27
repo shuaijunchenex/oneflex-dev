@@ -61,6 +61,7 @@ yaml_folder_fl_nodes_files:
 yaml_folder_optimizer_files:
 - sgd.yaml: sgd
 - adam.yaml: adam
+- adamw.yaml: adamw
 
 yaml_folder_training_files:
 - training_epoch1.yaml: training_epoch1
@@ -73,26 +74,32 @@ yaml_folder_client_strategy_files:
 - fedavg.yaml: fedavg_client_strategy
 - rbla.yaml: rbla_client_strategy
 - sp.yaml: sp_client_strategy
+
 yaml_folder_server_strategy_files:
 - fedavg.yaml: fedavg_server_strategy
 - rbla.yaml: rbla_server_strategy
 - sp.yaml: sp_server_strategy
+
 yaml_folder_runner_strategy_files:
 - fedavg.yaml: fedavg_runner_strategy
 - rbla.yaml: rbla_runner_strategy
 - sp.yaml: sp_runner_strategy
+
 yaml_folder_trainer_files:
 - standard_trainer.yaml: trainer_standard
 - vit_trainer.yaml: trainer_vit
 - imdb_trainer.yaml: trainer_imdb
+
 yaml_folder_training_logger_files:
 - standard_training_logger.yaml: training_logger
+
 yaml_folder_general_files:
 - general_round30.yaml: general_round30
 - general_round60.yaml: general_round60
 - general_round100.yaml: general_round100
 - general_round150.yaml: general_round150
 - general_round300.yaml: general_round300
+
 yaml_folder_rank_distribution_files:
 - rank001.yaml: rank_distribution_001_homogeneous
 - rank002.yaml: rank_distribution_002_homogeneous
@@ -110,7 +117,7 @@ yaml_combination:
   - dataset_loader_cola
   - transformer_tinybert
   - cross_entropy
-  - sgd
+  - adamw
   - training_epoch3
   - fedavg_client_strategy
   - trainer_imdb
@@ -126,7 +133,7 @@ yaml_combination:
   - dataset_loader_cola
   - transformer_tinybert
   - cross_entropy
-  - sgd
+  - adamw
   - training_epoch3
   - cola_2clients
   - trainer_imdb

@@ -1,17 +1,13 @@
 import math
 import contextlib
-from typing import Any
+from typing import Any, Dict
 import torch
 import torch.nn as nn
 
-from torch.cuda.amp import GradScaler  # 仅在 CUDA + AMP 时实际启用
+from torch.cuda.amp import GradScaler
 from usyd_learning.ml_utils.model_utils import ModelUtils
 from usyd_learning.model_trainer import ModelTrainer, ModelTrainerArgs
 from usyd_learning.ml_utils.metric_calculator import MetricCalculator
-
-# 你已提供：
-# from usyd_learning.ml_utils.training_utils import TrainingUtils   # 含 make_autocast
-# from usyd_learning.ml_utils.ewma import ModelEWMA                 # 或按你的路径导入
 from usyd_learning.ml_utils.training_utils import TrainingUtils
 from usyd_learning.ml_utils.model_ewma import ModelEWMA
 

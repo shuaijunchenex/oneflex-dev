@@ -1,4 +1,5 @@
 import torch
+from typing import Any, Dict, List, Optional, Tuple
 
 class DatasetLoaderUtil:
     """
@@ -7,59 +8,115 @@ class DatasetLoaderUtil:
     
     # torchtext datasets
 
-    
     @staticmethod
-    def text_collate_fn(batch, tokenizer=None, vocab=None, max_len=256, pad_id=0):
+    def text_collate_fn(
+        batch,
+        tokenizer=None,
+        vocab=None,
+        max_len: int = 256,
+        pad_id: int = 0,
+        unk_id: Optional[int] = None,
+        # --- label handling ---
+        label_map: Optional[Dict[Any, int]] = None,
+        normalize_int_labels: bool = False,
+        # --- tuple format handling ---
+        tuple_format: str = "auto",  # "auto" | "label_text" | "idx_label_text"
+        require_labels: bool = True,
+    ):
         """
         Collate function for text datasets.
-                Converts list of samples into (padded_input_ids, labels).
-                Supports samples shaped as:
-                    - (label, text)
-                    - (idx, label, text)
-                    - dict with keys like {'label': ..., 'text': ...}
-                Text is taken as the last element for tuple/list, or the 'text' field for dict.
-                Label is taken as the first element, or the 'label' field for dict.
 
-        Args:
-            batch: list of (label, text) pairs
-            tokenizer: callable, text -> list of tokens
-            vocab: vocab object, supports vocab[token] -> id
-            max_len: maximum sequence length (truncate if longer)
-            pad_id: index used for padding
+        Supports samples shaped as:
+          - (label, text)                     -> tuple_format="label_text"
+          - (idx, label, text)                -> tuple_format="idx_label_text"
+          - dict with keys like {'label': ..., 'text': ...}
+          - (idx, text) is NOT a supervised sample; if present and require_labels=True -> error
 
-        Returns:
-            input_ids: LongTensor [B, L]
-            labels:    LongTensor [B]
+        Label mapping policy:
+          - If labels are strings: you MUST provide label_map (dataset-level, stable).
+          - If labels are ints:
+              * default: keep as-is (no remap)
+              * if normalize_int_labels=True: remap to [0..K-1] using label_map if given,
+                else build a batch-local map (not recommended for training consistency).
         """
         if tokenizer is None or vocab is None:
             raise ValueError("text_collate_fn requires tokenizer and vocab.")
+        if not batch:
+            raise ValueError("Empty batch.")
 
-        def _extract_label_text(sample):
+        # choose unk_id
+        if unk_id is None:
+            # try common patterns
+            try:
+                unk_id = vocab["<unk>"]
+            except Exception:
+                try:
+                    unk_id = vocab.get("<unk>")  # type: ignore[attr-defined]
+                except Exception:
+                    unk_id = pad_id  # fallback
+
+        def _vocab_lookup(token: str) -> int:
+            # robust lookup with unk fallback
+            try:
+                return vocab[token]
+            except Exception:
+                try:
+                    return vocab.get(token, unk_id)  # type: ignore[attr-defined]
+                except Exception:
+                    return unk_id
+
+        def _extract_label_text(sample) -> Tuple[Any, str]:
             # Dict sample
             if isinstance(sample, dict):
-                label = sample.get("label", sample.get("labels"))
-                text = sample.get("text", sample.get("sentence", sample.get("content")))
-                return label, text
+                label = sample.get("label", sample.get("labels", None))
+                text = sample.get("text", sample.get("sentence", sample.get("content", "")))
+                return label, text if text is not None else ""
+
             # Tuple/list sample
             if isinstance(sample, (list, tuple)):
-                if len(sample) == 0:
+                n = len(sample)
+                if n == 0:
                     return None, ""
+
+                fmt = tuple_format
+                if fmt == "auto":
+                    fmt = "idx_label_text" if n == 3 else "label_text"
+
+                if fmt == "idx_label_text":
+                    if n < 3:
+                        # e.g., (idx, text) -> not supervised
+                        return None, str(sample[-1]) if n >= 1 else ""
+                    label = sample[1]
+                    text = sample[-1]
+                    return label, "" if text is None else str(text)
+
+                # fmt == "label_text"
+                if n < 2:
+                    # text-only or malformed
+                    return None, str(sample[0]) if n == 1 else ""
                 label = sample[0]
                 text = sample[-1]
-                return label, text
-            # Otherwise treat as text-only
-            return None, sample
+                return label, "" if text is None else str(text)
 
-        labels_texts = [ _extract_label_text(s) for s in batch ]
+            # Otherwise treat as text-only
+            return None, "" if sample is None else str(sample)
+
+        labels_texts = [_extract_label_text(s) for s in batch]
         labels, texts = zip(*labels_texts)
+
+        if require_labels and any(l is None for l in labels):
+            raise ValueError(
+                "Some samples have no label (e.g., (idx,text) or missing 'label'). "
+                "Set require_labels=False if you intentionally want unlabeled batches."
+            )
 
         # tokenize + map to ids
         tokenized = [tokenizer(t) for t in texts]
-        ids = [[vocab[token] for token in toks] for toks in tokenized]
+        ids = [[_vocab_lookup(tok) for tok in toks] for toks in tokenized]
 
         # pad / truncate
-        batch_max_len = min(max(len(seq) for seq in ids), max_len)
-        padded = []
+        batch_max_len = min(max((len(seq) for seq in ids), default=0), max_len)
+        padded: List[List[int]] = []
         for seq in ids:
             if len(seq) > batch_max_len:
                 seq = seq[:batch_max_len]
@@ -68,21 +125,112 @@ class DatasetLoaderUtil:
             padded.append(seq)
 
         input_ids = torch.tensor(padded, dtype=torch.long)
-        
-        # Normalize labels: strings -> ids, integers -> zero-based contiguous ids
-        unique_labels = sorted(set(labels)) if labels else []
-        if labels:
-            if isinstance(labels[0], str):
-                label_map = {l: i for i, l in enumerate(unique_labels)}
-                labels = [label_map[l] for l in labels]
-            else:
-                # integer-like labels; remap to [0..K-1] to avoid out-of-bounds
-                label_map = {l: i for i, l in enumerate(unique_labels)}
-                labels = [label_map[l] for l in labels]
-        
-        labels = torch.tensor(labels, dtype=torch.long)
 
-        return input_ids, labels
+        # labels tensor
+        if not require_labels and all(l is None for l in labels):
+            # return dummy labels (or you can return None, depending on your pipeline)
+            return input_ids, None
+
+        # Map/encode labels
+        first_non_none = next((l for l in labels if l is not None), None)
+
+        if isinstance(first_non_none, str):
+            if label_map is None:
+                raise ValueError(
+                    "String labels detected but label_map is None. "
+                    "Provide a stable dataset-level label_map, e.g., {'neg':0,'pos':1}."
+                )
+            mapped = [label_map[l] for l in labels]
+        else:
+            # integer-ish or other hashables
+            if normalize_int_labels:
+                if label_map is None:
+                    # batch-local mapping (use with caution)
+                    uniq = sorted(set(labels))
+                    label_map = {l: i for i, l in enumerate(uniq)}
+                mapped = [label_map[l] for l in labels]
+            else:
+                mapped = list(labels)
+
+        labels_tensor = torch.tensor(mapped, dtype=torch.long)
+        return input_ids, labels_tensor
+
+    
+    # @staticmethod
+    # def text_collate_fn(batch, tokenizer=None, vocab=None, max_len=256, pad_id=0):
+    #     """
+    #     Collate function for text datasets.
+    #             Converts list of samples into (padded_input_ids, labels).
+    #             Supports samples shaped as:
+    #                 - (label, text)
+    #                 - (idx, label, text)
+    #                 - dict with keys like {'label': ..., 'text': ...}
+    #             Text is taken as the last element for tuple/list, or the 'text' field for dict.
+    #             Label is taken as the first element, or the 'label' field for dict.
+
+    #     Args:
+    #         batch: list of (label, text) pairs
+    #         tokenizer: callable, text -> list of tokens
+    #         vocab: vocab object, supports vocab[token] -> id
+    #         max_len: maximum sequence length (truncate if longer)
+    #         pad_id: index used for padding
+
+    #     Returns:
+    #         input_ids: LongTensor [B, L]
+    #         labels:    LongTensor [B]
+    #     """
+    #     if tokenizer is None or vocab is None:
+    #         raise ValueError("text_collate_fn requires tokenizer and vocab.")
+
+    #     def _extract_label_text(sample):
+    #         # Dict sample
+    #         if isinstance(sample, dict):
+    #             label = sample.get("label", sample.get("labels"))
+    #             text = sample.get("text", sample.get("sentence", sample.get("content")))
+    #             return label, text
+    #         # Tuple/list sample
+    #         if isinstance(sample, (list, tuple)):
+    #             if len(sample) == 0:
+    #                 return None, ""
+    #             label = sample[0]
+    #             text = sample[-1]
+    #             return label, text
+    #         # Otherwise treat as text-only
+    #         return None, sample
+
+    #     labels_texts = [ _extract_label_text(s) for s in batch ]
+    #     labels, texts = zip(*labels_texts)
+
+    #     # tokenize + map to ids
+    #     tokenized = [tokenizer(t) for t in texts]
+    #     ids = [[vocab[token] for token in toks] for toks in tokenized]
+
+    #     # pad / truncate
+    #     batch_max_len = min(max(len(seq) for seq in ids), max_len)
+    #     padded = []
+    #     for seq in ids:
+    #         if len(seq) > batch_max_len:
+    #             seq = seq[:batch_max_len]
+    #         else:
+    #             seq = seq + [pad_id] * (batch_max_len - len(seq))
+    #         padded.append(seq)
+
+    #     input_ids = torch.tensor(padded, dtype=torch.long)
+        
+    #     # Normalize labels: strings -> ids, integers -> zero-based contiguous ids
+    #     unique_labels = sorted(set(labels)) if labels else []
+    #     if labels:
+    #         if isinstance(labels[0], str):
+    #             label_map = {l: i for i, l in enumerate(unique_labels)}
+    #             labels = [label_map[l] for l in labels]
+    #         else:
+    #             # integer-like labels; remap to [0..K-1] to avoid out-of-bounds
+    #             label_map = {l: i for i, l in enumerate(unique_labels)}
+    #             labels = [label_map[l] for l in labels]
+        
+    #     labels = torch.tensor(labels, dtype=torch.long)
+
+    #     return input_ids, labels
 
     @staticmethod
     def text_pair_collate_fn(batch, tokenizer=None, vocab=None, max_len=256, pad_id=0, combine_fn=None):
