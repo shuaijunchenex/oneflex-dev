@@ -18,7 +18,7 @@ g_app = SampleAppEntry()
 
 def main():
     # Load app config set from yaml file
-    g_app.load_app_config("./fl_lora_sample/convergence_experiment/rbla_r001_epoch1.yaml")
+    g_app.load_app_config("./fl_lora_sample/convergence_experiment/fmnist/rbla_r001_epoch1.yaml")
     device = ModelUtils.accelerator_device()
     
     # Get training rounds
