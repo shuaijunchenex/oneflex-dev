@@ -67,8 +67,8 @@ class ModelEvaluator:
                 total_samples += inputs.size(0)
 
                 predicted = outputs.argmax(dim=1)
-                all_preds.extend(predicted.cpu().numpy())
-                all_labels.extend(labels.cpu().numpy())
+                all_preds.extend(predicted.cpu().tolist())
+                all_labels.extend(labels.cpu().tolist())
 
         avg_loss = total_loss / max(total_samples, 1)
 
