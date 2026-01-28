@@ -114,7 +114,7 @@ def build_loss():
 	return LossFunctionBuilder.build(loss_cfg)
 
 
-def train_and_eval(epochs: int = 50, batch_size: int = 32, max_len: int = 128, lr: float = 2e-5, weight_decay: float = 0.01):
+def train_and_eval(epochs: int = 30, batch_size: int = 32, max_len: int = 128, lr: float = 2e-5, weight_decay: float = 0.01):
 	device = "cuda" if torch.cuda.is_available() else "cpu"
 
 	# 1) Tokenizer

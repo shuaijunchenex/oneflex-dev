@@ -65,17 +65,18 @@ class ModelEvaluator:
 
                 loss = self.criterion(outputs, labels)
 
-                # Determine batch size robustly (tensors, dict/BatchEncoding, lists)
-                if hasattr(inputs, "size"):
-                    batch_size = int(inputs.size(0))
-                elif isinstance(inputs, dict):
-                    first = next((v for v in inputs.values() if torch.is_tensor(v)), None)
-                    batch_size = int(first.size(0)) if first is not None else len(inputs)
-                else:
-                    try:
-                        batch_size = len(inputs)  # type: ignore[arg-type]
-                    except Exception:
-                        batch_size = int(labels.size(0))
+                # Use labels as ground truth batch size to avoid undercount when inputs is BatchEncoding
+                try:
+                    batch_size = int(labels.size(0))
+                except Exception:
+                    # Fallbacks for edge cases
+                    if hasattr(inputs, "size"):
+                        batch_size = int(inputs.size(0))
+                    elif isinstance(inputs, dict):
+                        first = next((v for v in inputs.values() if torch.is_tensor(v)), None)
+                        batch_size = int(first.size(0)) if first is not None else len(inputs)
+                    else:
+                        batch_size = 1
 
                 total_loss += loss.item() * batch_size
                 total_samples += batch_size
