@@ -103,12 +103,12 @@ def build_loss():
 
 
 def train_and_eval(
-	epochs: int = 3,
-	batch_size: int = 32,
+	epochs: int = 60,
+	batch_size: int = 64,
 	max_len: int = 128,
-	lr: float = 2e-5,
+	lr: float = 5e-5,
 	weight_decay: float = 0.01,
-	warmup_ratio: float = 0.06,
+	warmup_ratio: float = 0.1,
 	max_grad_norm: float = 1.0,
 	seed: int = 42,
 ):
@@ -162,12 +162,20 @@ def train_and_eval(
 		optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
 	)
 
-	# 4) Manual training loop (baseline-style)
+	# 4) Manual training loop with validation and early stopping
 	console.info(
 		f"Training TinyBERT on CoLA for {epochs} epochs | lr={lr} wd={weight_decay} warmup={warmup_ratio} bs={batch_size} device={device}"
 	)
-	model.train()
+	
+	# Early stopping parameters
+	best_mcc = -1.0
+	patience = 5
+	patience_counter = 0
+	best_model_state = None
+	
 	for epoch in range(1, epochs + 1):
+		# Training phase
+		model.train()
 		total_loss = 0.0
 		num_batches = 0
 		num_samples = 0
@@ -193,18 +201,56 @@ def train_and_eval(
 			num_samples += batch_samples
 
 		avg_loss = total_loss / max(num_samples, 1)
-		console.info(f"Epoch {epoch}/{epochs} | batches={num_batches} samples={num_samples}/{train_samples} | train_loss={avg_loss:.4f}")
+		
+		# Validation phase
+		model.eval()
+		evaluator = ModelEvaluator(model, dev_dl, criterion=loss_fn, device=device)
+		val_metrics = evaluator.evaluate()
+		val_mcc = val_metrics.get('mcc', 0.0)
+		val_acc = val_metrics.get('accuracy', 0.0)
+		val_loss = val_metrics.get('average_loss', 0.0)
+		
+		console.info(
+			f"Epoch {epoch}/{epochs} | train_loss={avg_loss:.4f} | "
+			f"val_loss={val_loss:.4f} | val_acc={val_acc:.4f} | val_mcc={val_mcc:.4f}"
+		)
+		
+		# Early stopping logic
+		if val_mcc > best_mcc:
+			best_mcc = val_mcc
+			patience_counter = 0
+			best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+			console.info(f"  *** New best MCC: {best_mcc:.4f} ***")
+		else:
+			patience_counter += 1
+			console.info(f"  No improvement. Patience: {patience_counter}/{patience}")
+			if patience_counter >= patience:
+				console.info(f"Early stopping triggered at epoch {epoch}")
+				break
 
-	# 5) Evaluation
+	# 5) Final Evaluation with best model
+	if best_model_state is not None:
+		console.info("\nLoading best model for final evaluation...")
+		model.load_state_dict({k: v.to(device) for k, v in best_model_state.items()})
+	
 	model.eval()
 	evaluator = ModelEvaluator(model, dev_dl, criterion=loss_fn, device=device)
 	metrics = evaluator.evaluate()
+	console.info("\n" + "="*60)
+	console.info("FINAL EVALUATION RESULTS:")
 	console.info(f"Dev metrics: {metrics}")
 	console.info(
-		f"Prediction distribution (dev): {metrics['total_test_samples']} samples | MCC={metrics.get('mcc')} | accuracy={metrics.get('accuracy')}"
+		f"Samples: {metrics['total_test_samples']} | "
+		f"MCC: {metrics.get('mcc', 0):.4f} | "
+		f"Accuracy: {metrics.get('accuracy', 0):.4f} | "
+		f"F1: {metrics.get('f1_score', 0):.4f}"
 	)
+	console.info("="*60)
 	return metrics
 
 
 if __name__ == "__main__":
-	train_and_eval(epochs = 30)
+	# 使用默认参数：epochs=60, lr=5e-5, batch_size=64, warmup_ratio=0.1
+	metrics = train_and_eval()
+	# 或者自定义参数，例如：
+	# metrics = train_and_eval(epochs=30, lr=3e-5, batch_size=32)
