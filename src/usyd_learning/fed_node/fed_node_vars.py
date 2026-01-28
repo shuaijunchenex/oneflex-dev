@@ -441,8 +441,21 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
 
     def prepare_vocab_tokenizer(self):
         if "tokenizer" in self.config_dict and self.config_dict["data_loader"]["task_type"] == "nlp":
+            use_hf = bool(self.config_dict.get("tokenizer", {}).get("use_hf_tokenizer", False))
+
+            # Build tokenizer (torchtext or HF). TokenizerBuilder.meta holds hf_tokenizer when available.
             self.tokenizer_builder = TokenizerBuilder(self.config_dict)
-            self.tokenizer = self.tokenizer_builder.build()
+            built = self.tokenizer_builder.build()
+
+            if use_hf and "hf_tokenizer" in getattr(self.tokenizer_builder, "meta", {}):
+                console.info("Using HuggingFace tokenizer...")
+                self.tokenizer = self.tokenizer_builder.meta.get("hf_tokenizer")
+                # Prefer hf vocab size if present
+                self.vocab_size = getattr(self.tokenizer, "vocab_size", None)
+            else:
+                # legacy torchtext tokenizer function
+                self.tokenizer = built
+
             args = FedNodeEventArgs("tokenizer", self.config_dict).with_sender(self).with_data(self.tokenizer)
             self.raise_event("on_prepare_tokenizer", args)
 
@@ -457,17 +470,25 @@ class FedNodeVars(ObjectMap, EventHandler, KeyValueArgs):
             task_type = self.config_dict["data_loader"].get("task_type", "image")
 
         if task_type == "nlp":
-            if FedNodeVars.share_vocab is None and self.data_loader is not None:
-                if hasattr(self.data_loader, "vocab") and self.data_loader.vocab is not None:
-                    FedNodeVars.share_vocab = self.data_loader.vocab
-                else:
-                    console.info("Building global vocab from server data...")
-                    data_input = self.data_loader.data_set
-                    FedNodeVars.share_vocab = TokenizerBuilder.build_vocab(data_input, self.tokenizer)
-            
-            self.vocab = FedNodeVars.share_vocab
-            if self.vocab is not None:
-                self.vocab_size = len(self.vocab)
+            use_hf = bool(self.config_dict.get("tokenizer", {}).get("use_hf_tokenizer", False))
+            if use_hf:
+                console.info("Using HuggingFace tokenizer vocab...")
+                # HF tokenizer path: skip vocab building, rely on tokenizer.vocab_size
+                if self.vocab_size is None and self.tokenizer is not None:
+                    self.vocab_size = getattr(self.tokenizer, "vocab_size", None)
+                self.vocab = None
+            else:
+                if FedNodeVars.share_vocab is None and self.data_loader is not None:
+                    if hasattr(self.data_loader, "vocab") and self.data_loader.vocab is not None:
+                        FedNodeVars.share_vocab = self.data_loader.vocab
+                    else:
+                        console.info("Building global vocab from server data...")
+                        data_input = self.data_loader.data_set
+                        FedNodeVars.share_vocab = TokenizerBuilder.build_vocab(data_input, self.tokenizer)
+                
+                self.vocab = FedNodeVars.share_vocab
+                if self.vocab is not None:
+                    self.vocab_size = len(self.vocab)
 
         # Raise event
         args = FedNodeEventArgs("vocab", self.config_dict).with_sender(self).with_data(self.vocab)

@@ -25,7 +25,7 @@ yaml_folder_client_selection_files:
 - random.yaml: client_selection_random
 
 yaml_folder_tokenizer_files:
-- basic_english.yaml: tokenizer_basic_english
+- bert_tokenizer.yaml: tokenizer_bert
 
 yaml_folder_role_files:
 - server.yaml: role_server
@@ -121,7 +121,7 @@ yaml_combination:
   - training_epoch3
   - fedavg_client_strategy
   - trainer_imdb
-  - tokenizer_basic_english
+  - tokenizer_bert
   - cola_2clients
 
   edge_yaml: []
@@ -137,7 +137,7 @@ yaml_combination:
   - training_epoch3
   - cola_2clients
   - trainer_imdb
-  - tokenizer_basic_english
+  - tokenizer_bert
   - client_selection_random
   - fedavg_server_strategy
   - aggregation_fedavg

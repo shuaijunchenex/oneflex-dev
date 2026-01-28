@@ -7,7 +7,6 @@ from torchtext.datasets import AG_NEWS
 from ..dataset_loader import DatasetLoader
 from ..dataset_loader_args import DatasetLoaderArgs
 from ..dataset_loader_util import DatasetLoaderUtil
-from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
 
 """
 Dataset loader for AG_NEWS (train/test splits)
@@ -38,17 +37,15 @@ class DatasetLoader_Agnews(DatasetLoader):
         self._dataset = AG_NEWS(root=root, split=train_split)
         self._test_dataset = AG_NEWS(root=root, split=test_split)
 
-        tokenizer = getattr(args, "tokenizer")
-        self.vocab = getattr(args, "vocab", None)
-        if self.vocab is None:
-            self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
-
-        args.vocab_size = len(self.vocab)
+        hf_tokenizer = getattr(args, "tokenizer")
+        args.vocab_size = getattr(hf_tokenizer, "vocab_size", None)
 
         collate = partial(
-            DatasetLoaderUtil.text_collate_fn,
-            tokenizer=tokenizer,
-            vocab=self.vocab,
+            DatasetLoaderUtil.text_collate_fn_hf,
+            hf_tokenizer=hf_tokenizer,
+            max_len=getattr(args, "max_len", 256),
+            label_map={1: 0, 2: 1, 3: 2, 4: 3},
+            normalize_int_labels=False,
         )
 
         self._data_loader = DataLoader(

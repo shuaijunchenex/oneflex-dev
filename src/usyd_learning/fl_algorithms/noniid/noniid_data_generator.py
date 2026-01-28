@@ -52,22 +52,41 @@ class NoniidDataGenerator:
     #     self.y_train = torch.cat(labels_list, dim=0)
 
     def _load_data(self):
-        """Load data from DataLoader. Handles both image tensors and text lists."""
+        """Load data from DataLoader. Handles tensors, HuggingFace encodings, or raw text."""
         data_list, labels_list = [], []
+
+        try:
+            from transformers.tokenization_utils_base import BatchEncoding  # type: ignore
+        except Exception:  # transformers might be optional
+            BatchEncoding = tuple()  # type: ignore
+
         for inputs, labels in self.dataloader:
-            # Handle labels: ensure they are Tensors
-            if not torch.is_tensor(labels):
-                labels = torch.as_tensor(labels)
-            
-            # Handle data (inputs): could be image tensors or text strings
-            if not torch.is_tensor(inputs):
+            # Ensure labels are tensors for downstream unique/slicing
+            labels = labels if torch.is_tensor(labels) else torch.as_tensor(labels)
+
+            # Normalize inputs: tensors, BatchEncoding, dicts, tokenizers.Encoding
+            if torch.is_tensor(inputs):
+                norm_inputs = inputs
+            elif BatchEncoding and isinstance(inputs, BatchEncoding):
+                # HF tokenizer batch output; prefer input_ids
+                if "input_ids" in inputs:
+                    norm_inputs = inputs["input_ids"]
+                else:
+                    first_val = next((v for v in inputs.values() if torch.is_tensor(v)), None)
+                    norm_inputs = first_val if first_val is not None else inputs
+            elif hasattr(inputs, "ids"):
+                # tokenizers.Encoding (fast) exposes .ids
+                norm_inputs = torch.as_tensor(getattr(inputs, "ids"))
+            elif isinstance(inputs, dict) and "input_ids" in inputs:
+                tensor_val = inputs["input_ids"]
+                norm_inputs = tensor_val if torch.is_tensor(tensor_val) else torch.as_tensor(tensor_val)
+            else:
                 try:
-                    inputs = torch.as_tensor(inputs)
-                except (ValueError, TypeError):
-                    # If it's text (list of strings), keep as is
-                    pass
-            
-            data_list.append(inputs)
+                    norm_inputs = torch.as_tensor(inputs)
+                except Exception:
+                    norm_inputs = inputs
+
+            data_list.append(norm_inputs)
             labels_list.append(labels)
 
         # Merge X (data)

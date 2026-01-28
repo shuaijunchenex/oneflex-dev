@@ -42,29 +42,43 @@ class ModelEvaluator:
 
         with torch.inference_mode():
             for inputs, labels in getattr(self.val_loader, "test_data_loader", self.val_loader):
-                inputs = inputs.to(self.device, non_blocking=True)
+                # Move inputs/labels to device; handle HF BatchEncoding/dict
+                if hasattr(inputs, "to"):
+                    inputs = inputs.to(self.device, non_blocking=True)
+                elif isinstance(inputs, dict):
+                    inputs = {k: (v.to(self.device, non_blocking=True) if hasattr(v, "to") else v)
+                              for k, v in inputs.items()}
                 labels = labels.to(self.device).long()
 
                 outputs = self.model(inputs)
 
-                # Guard: remap labels to valid range [0, num_classes-1]
+                # Guard: only clamp out-of-range labels; avoid per-batch remapping that skews metrics
                 num_classes = outputs.shape[1] if outputs.dim() > 1 else 1
-                uniq = torch.unique(labels)
-                if uniq.numel() > 0:
-                    # Build contiguous mapping
-                    label_map = {int(l): i for i, l in enumerate(sorted(uniq.tolist()))}
-                    remapped = torch.tensor([label_map[int(l)] for l in labels.tolist()], device=self.device)
-                    if remapped.max().item() >= num_classes or len(label_map) > num_classes:
-                        from ..ml_utils import console
+                if labels.numel() > 0:
+                    min_label = labels.min().item()
+                    max_label = labels.max().item()
+                    if min_label < 0 or max_label >= num_classes:
                         console.warn(
-                            f"Label values {uniq.tolist()} exceed model classes ({num_classes}); remapping and clipping."
+                            f"Label values out of range [{min_label}, {max_label}] for num_classes={num_classes}; clamping to [0, {num_classes - 1}]."
                         )
-                        remapped = torch.clamp(remapped, max=num_classes - 1)
-                    labels = remapped
+                        labels = torch.clamp(labels, min=0, max=max(num_classes - 1, 0))
 
                 loss = self.criterion(outputs, labels)
-                total_loss += loss.item() * inputs.size(0)
-                total_samples += inputs.size(0)
+
+                # Determine batch size robustly (tensors, dict/BatchEncoding, lists)
+                if hasattr(inputs, "size"):
+                    batch_size = int(inputs.size(0))
+                elif isinstance(inputs, dict):
+                    first = next((v for v in inputs.values() if torch.is_tensor(v)), None)
+                    batch_size = int(first.size(0)) if first is not None else len(inputs)
+                else:
+                    try:
+                        batch_size = len(inputs)  # type: ignore[arg-type]
+                    except Exception:
+                        batch_size = int(labels.size(0))
+
+                total_loss += loss.item() * batch_size
+                total_samples += batch_size
 
                 predicted = outputs.argmax(dim=1)
                 all_preds.extend(predicted.cpu().tolist())

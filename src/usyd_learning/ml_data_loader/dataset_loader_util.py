@@ -155,6 +155,97 @@ class DatasetLoaderUtil:
         labels_tensor = torch.tensor(mapped, dtype=torch.long)
         return input_ids, labels_tensor
 
+    @staticmethod
+    def text_collate_fn_hf(
+        batch,
+        hf_tokenizer=None,
+        max_len: int = 256,
+        # --- label handling ---
+        label_map: Optional[Dict[Any, int]] = None,
+        normalize_int_labels: bool = False,
+        # --- tuple format handling ---
+        tuple_format: str = "auto",  # "auto" | "label_text" | "idx_label_text"
+        require_labels: bool = True,
+    ):
+        """
+        Collate function for HuggingFace tokenizers. Returns (encodings, labels_tensor|None).
+        """
+        if hf_tokenizer is None:
+            raise ValueError("text_collate_fn_hf requires hf_tokenizer.")
+        if not batch:
+            raise ValueError("Empty batch.")
+
+        def _extract_label_text(sample) -> Tuple[Any, str]:
+            if isinstance(sample, dict):
+                label = sample.get("label", sample.get("labels", None))
+                text = sample.get("text", sample.get("sentence", sample.get("content", "")))
+                return label, "" if text is None else str(text)
+
+            if isinstance(sample, (list, tuple)):
+                n = len(sample)
+                if n == 0:
+                    return None, ""
+
+                fmt = tuple_format
+                if fmt == "auto":
+                    fmt = "idx_label_text" if n == 3 else "label_text"
+
+                if fmt == "idx_label_text":
+                    if n < 3:
+                        return None, str(sample[-1]) if n >= 1 else ""
+                    label = sample[1]
+                    text = sample[-1]
+                    return label, "" if text is None else str(text)
+
+                # "label_text"
+                if n < 2:
+                    return None, str(sample[0]) if n == 1 else ""
+                label = sample[0]
+                text = sample[-1]
+                return label, "" if text is None else str(text)
+
+            return None, "" if sample is None else str(sample)
+
+        labels_texts = [_extract_label_text(s) for s in batch]
+        labels, texts = zip(*labels_texts)
+
+        if require_labels and any(l is None for l in labels):
+            raise ValueError(
+                "Some samples have no label (e.g., (idx,text) or missing 'label'). "
+                "Set require_labels=False if you intentionally want unlabeled batches."
+            )
+
+        enc = hf_tokenizer(
+            list(texts),
+            add_special_tokens=True,
+            truncation=True,
+            max_length=max_len,
+            padding=True,
+            return_tensors="pt",
+            return_attention_mask=True,
+        )
+
+        if not require_labels and all(l is None for l in labels):
+            return enc, None
+
+        first_non_none = next((l for l in labels if l is not None), None)
+
+        if isinstance(first_non_none, str):
+            if label_map is None:
+                raise ValueError("String labels detected but label_map is None.")
+            mapped = [label_map[l] for l in labels]
+        else:
+            if normalize_int_labels:
+                if label_map is None:
+                    uniq = sorted(set(labels))
+                    label_map = {l: i for i, l in enumerate(uniq)}
+                mapped = [label_map[l] for l in labels]
+            else:
+                mapped = [int(l) for l in labels]
+
+        labels_tensor = torch.tensor(mapped, dtype=torch.long)
+        return enc, labels_tensor
+
     
     # @staticmethod
     # def text_collate_fn(batch, tokenizer=None, vocab=None, max_len=256, pad_id=0):

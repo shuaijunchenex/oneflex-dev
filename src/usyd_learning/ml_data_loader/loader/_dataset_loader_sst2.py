@@ -7,7 +7,6 @@ from torchtext.datasets import SST2
 from ..dataset_loader import DatasetLoader
 from ..dataset_loader_args import DatasetLoaderArgs
 from ..dataset_loader_util import DatasetLoaderUtil
-from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
 
 """
 Dataset loader for SST-2 (GLUE)
@@ -45,17 +44,14 @@ class DatasetLoader_SST2(DatasetLoader):
         self._dataset = SST2(root=root, split=train_split)
         self._test_dataset = SST2(root=root, split=test_split)
 
-        tokenizer = getattr(args, "tokenizer")
-        self.vocab = getattr(args, "vocab", None)
-        if self.vocab is None:
-            self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
-            
-        args.vocab_size = len(self.vocab)
+        hf_tokenizer = getattr(args, "tokenizer")
+        args.vocab_size = getattr(hf_tokenizer, "vocab_size", None)
 
         collate = partial(
-            DatasetLoaderUtil.text_collate_fn,
-            tokenizer=tokenizer,
-            vocab=self.vocab,
+            DatasetLoaderUtil.text_collate_fn_hf,
+            hf_tokenizer=hf_tokenizer,
+            max_len=getattr(args, "max_len", 256),
+            normalize_int_labels=False,
         )
 
         self._data_loader = DataLoader(

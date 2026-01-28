@@ -7,7 +7,6 @@ from ..dataset_loader_util import DatasetLoaderUtil
 from torch.utils.data import DataLoader #
 from torchtext.datasets import IMDB
 from torch.utils.data import IterableDataset
-from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
 from functools import partial
 from datasets import load_dataset
 
@@ -48,11 +47,8 @@ class DatasetLoader_Imdb(DatasetLoader):
         # self._dataset = list(IMDB(root=root, split="train"))
         # self._test_dataset = list(IMDB(root=root, split="test"))
 
-        self.vocab = getattr(args, "vocab", None)
-        if self.vocab is None:
-            self.vocab = TokenizerBuilder.build_vocab(self._dataset, args.tokenizer)
-        
-        args.vocab_size = len(self.vocab)
+        hf_tokenizer = getattr(args, "tokenizer")
+        args.vocab_size = getattr(hf_tokenizer, "vocab_size", None)
 
         if is_download:
             self._warmup_download(root)
@@ -62,7 +58,12 @@ class DatasetLoader_Imdb(DatasetLoader):
             batch_size=batch_size,
             shuffle= True,
             num_workers=num_workers,
-            collate_fn=partial(DatasetLoaderUtil.text_collate_fn, tokenizer=args.tokenizer, vocab=self.vocab),
+            collate_fn=partial(
+                DatasetLoaderUtil.text_collate_fn_hf,
+                hf_tokenizer=hf_tokenizer,
+                max_len=getattr(args, "max_len", 256),
+                label_map={"neg": 0, "pos": 1},
+            ),
         )
 
         self.data_sample_num = 25000
@@ -72,7 +73,12 @@ class DatasetLoader_Imdb(DatasetLoader):
             batch_size=test_batch_size,
             shuffle=False,
             num_workers=num_workers,
-            collate_fn=partial(DatasetLoaderUtil.text_collate_fn, tokenizer=args.tokenizer, vocab=self.vocab),
+            collate_fn=partial(
+                DatasetLoaderUtil.text_collate_fn_hf,
+                hf_tokenizer=hf_tokenizer,
+                max_len=getattr(args, "max_len", 256),
+                label_map={"neg": 0, "pos": 1},
+            ),
         )
         return
 

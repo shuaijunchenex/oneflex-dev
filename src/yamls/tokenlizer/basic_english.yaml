@@ -5,3 +5,4 @@ tokenizer:
   min_freq: 2            # 最小词频
   max_vocab: 30000       # 最大词汇表大小
   lower: True           # 是否转为小写（true/false）
+  use_hf_tokenizer: false  # 是否走HF tokenizer流程（若为true则需提供HF tokenizer配置）

@@ -3,11 +3,10 @@ from __future__ import annotations
 from functools import partial
 from torch.utils.data import DataLoader
 from torchtext.datasets import CoLA
-
+from collections import Counter
 from ..dataset_loader import DatasetLoader
 from ..dataset_loader_args import DatasetLoaderArgs
 from ..dataset_loader_util import DatasetLoaderUtil
-from ...ml_algorithms.tokenizer_builder import TokenizerBuilder
 
 """
 Dataset loader for CoLA (GLUE)
@@ -45,17 +44,20 @@ class DatasetLoader_CoLA(DatasetLoader):
         self._dataset = CoLA(root=root, split=train_split)
         self._test_dataset = CoLA(root=root, split=test_split)
 
-        tokenizer = getattr(args, "tokenizer")
-        self.vocab = getattr(args, "vocab", None)
-        if self.vocab is None:
-            self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
-            
-        args.vocab_size = len(self.vocab)
+        # train_label_dist = self._count_label_distribution(self._dataset)
+        # test_label_dist = self._count_label_distribution(self._test_dataset)
+
+        # self.train_label_distribution = dict(train_label_dist)
+        # self.test_label_distribution = dict(test_label_dist)
+
+        hf_tokenizer = getattr(args, "tokenizer")
+        args.vocab_size = getattr(hf_tokenizer, "vocab_size", None)
 
         collate = partial(
-            DatasetLoaderUtil.text_collate_fn,
-            tokenizer=tokenizer,
-            vocab=self.vocab,
+            DatasetLoaderUtil.text_collate_fn_hf,
+            hf_tokenizer=hf_tokenizer,
+            max_len=getattr(args, "max_len", 256),
+            normalize_int_labels=False,
         )
 
         self._data_loader = DataLoader(
@@ -85,3 +87,68 @@ class DatasetLoader_CoLA(DatasetLoader):
         if self._data_loader is not None:
             return self._data_loader.dataset
         raise ValueError("ERROR: DatasetLoader's data_loader is None.")
+    
+    def _extract_label_from_sample(self, sample):
+        """
+        Robustly extract label from a CoLA sample.
+        Supports: tuple/list, dict-like, or object with attributes.
+        Returns int label.
+        """
+        # 1) dict-like
+        if isinstance(sample, dict):
+            for k in ("label", "labels", "y", "target"):
+                if k in sample:
+                    return int(sample[k])
+
+        # 2) tuple/list: try common layouts
+        if isinstance(sample, (tuple, list)):
+            # Common patterns:
+            # (text, label)
+            # (label, text)
+            # (idx, text, label) / (text, label, idx) etc.
+            for i, v in enumerate(sample):
+                # Label is usually 0/1 int-like or 0/1 tensor-like
+                try:
+                    iv = int(v)
+                    if iv in (0, 1):
+                        return iv
+                except Exception:
+                    pass
+
+            # Fallback: many torchtext datasets put label at the last position
+            # (works when label is '0'/'1' or int-like)
+            try:
+                return int(sample[-1])
+            except Exception:
+                pass
+
+        # 3) object with attributes
+        for attr in ("label", "labels", "y", "target"):
+            if hasattr(sample, attr):
+                return int(getattr(sample, attr))
+
+        raise ValueError(f"Cannot extract label from sample type={type(sample)} value={sample}")
+
+    def _count_label_distribution(self, dataset, debug_print_first: bool = True):
+        """
+        Count 0/1 labels in dataset without assuming sample structure.
+        """
+        counter = Counter()
+
+        it = iter(dataset)
+        try:
+            first = next(it)
+        except StopIteration:
+            return counter
+
+        if debug_print_first:
+            print(f"[CoLA] first sample type={type(first)} value={first}")
+
+        # count first
+        counter[self._extract_label_from_sample(first)] += 1
+
+        # count rest
+        for sample in it:
+            counter[self._extract_label_from_sample(sample)] += 1
+
+        return counter
