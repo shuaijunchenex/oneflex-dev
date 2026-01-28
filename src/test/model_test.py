@@ -83,18 +83,6 @@ def build_model(pad_id: int):
 	return model
 
 
-def _count_labels(loader) -> Tuple[int, int]:
-	"""Count label distribution in a DataLoader (labels in batch[1])."""
-	from collections import Counter
-	ctr = Counter()
-	for _, labels in loader:
-		lbl = labels
-		if hasattr(lbl, "tolist"):
-			lbl = lbl.tolist()
-		ctr.update(lbl)
-	return ctr.get(0, 0), ctr.get(1, 0)
-
-
 def build_optimizer(model, lr: float, weight_decay: float):
 	opt_cfg = {
 		"optimizer": {
@@ -144,20 +132,30 @@ def train_and_eval(
 
 	# 2) Data
 	train_dl, dev_dl, cola_loader = build_dataloaders(hf_tok, batch_size, max_len)
-	train_y0, train_y1 = _count_labels(train_dl)
-	dev_y0, dev_y1 = _count_labels(dev_dl)
-	console.info(f"CoLA label balance - train: 0={train_y0}, 1={train_y1}; dev: 0={dev_y0}, 1={dev_y1}")
 
 	# 3) Model / Optimizer / Loss / Scheduler
 	model = build_model(pad_id).to(device)
 	optimizer = build_optimizer(model, lr, weight_decay)
 	loss_fn = build_loss()
 
-	try:
-		steps_per_epoch = len(train_dl)
-	except TypeError:
-		# torchtext IterDataPipe has no __len__; estimate via label count and batch size
-		steps_per_epoch = math.ceil((train_y0 + train_y1) / max(batch_size, 1))
+	# Steps/epoch estimation: prefer loader metadata, fallback to dataset len, then batch_size heuristic
+	steps_per_epoch = None
+	data_num = getattr(cola_loader, "data_sample_num", None)
+	if isinstance(data_num, int) and data_num > 0:
+		steps_per_epoch = math.ceil(data_num / max(batch_size, 1))
+	if steps_per_epoch is None:
+		try:
+			steps_per_epoch = len(train_dl)
+		except Exception:
+			pass
+	if steps_per_epoch is None:
+		ds = getattr(train_dl, "dataset", None)
+		try:
+			steps_per_epoch = math.ceil(len(ds) / max(batch_size, 1)) if ds is not None else None
+		except Exception:
+			pass
+	if steps_per_epoch is None:
+		steps_per_epoch = 100  # safe fallback
 	total_steps = steps_per_epoch * epochs
 	warmup_steps = int(total_steps * warmup_ratio)
 	scheduler = get_linear_schedule_with_warmup(
@@ -189,8 +187,8 @@ def train_and_eval(
 
 			total_loss += float(loss.detach().item()) * labels.size(0)
 
-		avg_loss = total_loss / max(train_y0 + train_y1, 1)
-		console.info(f"Epoch {epoch}/{epochs} train_loss={avg_loss:.4f}")
+		# avg_loss = total_loss / max(train_y0 + train_y1, 1)
+		# console.info(f"Epoch {epoch}/{epochs} train_loss={avg_loss:.4f}")
 
 	# 5) Evaluation
 	model.eval()
@@ -204,4 +202,4 @@ def train_and_eval(
 
 
 if __name__ == "__main__":
-	train_and_eval(epochs = 60)
+	train_and_eval(epochs = 3)
