@@ -20,14 +20,14 @@ startup_init_path(os.path.dirname(os.path.abspath(__file__)))
 
 from pathlib import Path
 from typing import Dict, Any, Tuple
+import math
 
 import torch
+from transformers import get_linear_schedule_with_warmup
 
 from usyd_learning.ml_algorithms import TokenizerBuilder, LossFunctionBuilder, OptimizerBuilder
 from usyd_learning.ml_data_loader.dataset_loader_factory import DatasetLoaderFactory
 from usyd_learning.ml_models import NNModelFactory
-from usyd_learning.model_trainer.model_trainer_factory import ModelTrainerFactory
-from usyd_learning.model_trainer.model_trainer_args import ModelTrainerArgs
 from usyd_learning.model_trainer.model_evaluator import ModelEvaluator
 from usyd_learning.ml_utils import console
 
@@ -114,8 +114,20 @@ def build_loss():
 	return LossFunctionBuilder.build(loss_cfg)
 
 
-def train_and_eval(epochs: int = 60, batch_size: int = 32, max_len: int = 128, lr: float = 2e-5, weight_decay: float = 0.01):
+def train_and_eval(
+	epochs: int = 3,
+	batch_size: int = 32,
+	max_len: int = 128,
+	lr: float = 2e-5,
+	weight_decay: float = 0.01,
+	warmup_ratio: float = 0.06,
+	max_grad_norm: float = 1.0,
+	seed: int = 42,
+):
 	device = "cuda" if torch.cuda.is_available() else "cpu"
+	torch.manual_seed(seed)
+	if torch.cuda.is_available():
+		torch.cuda.manual_seed_all(seed)
 
 	# 1) Tokenizer
 	tokenizer_cfg = {
@@ -136,27 +148,60 @@ def train_and_eval(epochs: int = 60, batch_size: int = 32, max_len: int = 128, l
 	dev_y0, dev_y1 = _count_labels(dev_dl)
 	console.info(f"CoLA label balance - train: 0={train_y0}, 1={train_y1}; dev: 0={dev_y0}, 1={dev_y1}")
 
-	# 3) Model / Optimizer / Loss
+	# 3) Model / Optimizer / Loss / Scheduler
 	model = build_model(pad_id).to(device)
 	optimizer = build_optimizer(model, lr, weight_decay)
 	loss_fn = build_loss()
 
-	# 4) Trainer
-	trainer_args = ModelTrainerFactory.create_args({"trainer": {"trainer_type": "imdb", "device": device}}, is_clone_dict=True)
-	trainer_args.set_trainer_args(model, optimizer, loss_fn, cola_loader, trainer_type="imdb")
-	trainer_args.device = device
-	trainer = ModelTrainerFactory.create(trainer_args)
+	try:
+		steps_per_epoch = len(train_dl)
+	except TypeError:
+		# torchtext IterDataPipe has no __len__; estimate via label count and batch size
+		steps_per_epoch = math.ceil((train_y0 + train_y1) / max(batch_size, 1))
+	total_steps = steps_per_epoch * epochs
+	warmup_steps = int(total_steps * warmup_ratio)
+	scheduler = get_linear_schedule_with_warmup(
+		optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+	)
 
-	console.info(f"Training TinyBERT on CoLA for {epochs} epochs (device={device})")
-	trainer.train(epochs)
+	# 4) Manual training loop (baseline-style)
+	console.info(
+		f"Training TinyBERT on CoLA for {epochs} epochs | lr={lr} wd={weight_decay} warmup={warmup_ratio} bs={batch_size} device={device}"
+	)
+	model.train()
+	for epoch in range(1, epochs + 1):
+		total_loss = 0.0
+		for batch in train_dl:
+			inputs, labels = batch
+			if isinstance(inputs, dict):
+				inputs = {k: (v.to(device) if hasattr(v, "to") else v) for k, v in inputs.items()}
+			else:
+				inputs = inputs.to(device)
+			labels = labels.to(device)
+
+			optimizer.zero_grad()
+			outputs = model(inputs)
+			loss = loss_fn(outputs, labels)
+			loss.backward()
+			torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+			optimizer.step()
+			scheduler.step()
+
+			total_loss += float(loss.detach().item()) * labels.size(0)
+
+		avg_loss = total_loss / max(train_y0 + train_y1, 1)
+		console.info(f"Epoch {epoch}/{epochs} train_loss={avg_loss:.4f}")
 
 	# 5) Evaluation
+	model.eval()
 	evaluator = ModelEvaluator(model, dev_dl, criterion=loss_fn, device=device)
 	metrics = evaluator.evaluate()
 	console.info(f"Dev metrics: {metrics}")
-	console.info(f"Prediction distribution (dev): {metrics['total_test_samples']} samples | MCC={metrics.get('mcc')} | accuracy={metrics.get('accuracy')}")
+	console.info(
+		f"Prediction distribution (dev): {metrics['total_test_samples']} samples | MCC={metrics.get('mcc')} | accuracy={metrics.get('accuracy')}"
+	)
 	return metrics
 
 
 if __name__ == "__main__":
-	train_and_eval()
+	train_and_eval(epochs = 60)
