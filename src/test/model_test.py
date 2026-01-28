@@ -130,33 +130,33 @@ def train_and_eval(
 	}
 	hf_tok, pad_id = build_tokenizer(tokenizer_cfg)
 
-	# 2) Data
+	# 2) Data - CRITICAL: torchtext CoLA returns IterDataPipe which exhausts after 1 iteration
+	# Convert to list to enable multi-epoch training
 	train_dl, dev_dl, cola_loader = build_dataloaders(hf_tok, batch_size, max_len)
+	
+	# Convert IterDataPipe to list for reusable dataset
+	train_dataset_list = list(train_dl.dataset) if hasattr(train_dl, 'dataset') else list(train_dl)
+	console.info(f"Loaded {len(train_dataset_list)} training samples from CoLA")
+	
+	# Recreate DataLoader with list-based dataset (collate_fn preserved)
+	from torch.utils.data import DataLoader
+	train_dl = DataLoader(
+		train_dataset_list,
+		batch_size=batch_size,
+		shuffle=True,
+		num_workers=0,
+		collate_fn=getattr(cola_loader.data_loader, 'collate_fn', None)
+	)
 
 	# 3) Model / Optimizer / Loss / Scheduler
 	model = build_model(pad_id).to(device)
 	optimizer = build_optimizer(model, lr, weight_decay)
 	loss_fn = build_loss()
 
-	# Steps/epoch estimation: prefer loader metadata, fallback to dataset len, then batch_size heuristic
-	steps_per_epoch = None
-	data_num = getattr(cola_loader, "data_sample_num", None)
-	if isinstance(data_num, int) and data_num > 0:
-		steps_per_epoch = math.ceil(data_num / max(batch_size, 1))
-	if steps_per_epoch is None:
-		try:
-			steps_per_epoch = len(train_dl)
-		except Exception:
-			pass
-	if steps_per_epoch is None:
-		ds = getattr(train_dl, "dataset", None)
-		try:
-			steps_per_epoch = math.ceil(len(ds) / max(batch_size, 1)) if ds is not None else None
-		except Exception:
-			pass
-	if steps_per_epoch is None:
-		steps_per_epoch = 100  # safe fallback
+	# Steps/epoch estimation from materialized dataset
+	steps_per_epoch = len(train_dl)
 	total_steps = steps_per_epoch * epochs
+	train_samples = len(train_dataset_list)
 	warmup_steps = int(total_steps * warmup_ratio)
 	scheduler = get_linear_schedule_with_warmup(
 		optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
@@ -169,6 +169,8 @@ def train_and_eval(
 	model.train()
 	for epoch in range(1, epochs + 1):
 		total_loss = 0.0
+		num_batches = 0
+		num_samples = 0
 		for batch in train_dl:
 			inputs, labels = batch
 			if isinstance(inputs, dict):
@@ -185,10 +187,13 @@ def train_and_eval(
 			optimizer.step()
 			scheduler.step()
 
-			total_loss += float(loss.detach().item()) * labels.size(0)
+			batch_samples = labels.size(0)
+			total_loss += float(loss.detach().item()) * batch_samples
+			num_batches += 1
+			num_samples += batch_samples
 
-		# avg_loss = total_loss / max(train_y0 + train_y1, 1)
-		# console.info(f"Epoch {epoch}/{epochs} train_loss={avg_loss:.4f}")
+		avg_loss = total_loss / max(num_samples, 1)
+		console.info(f"Epoch {epoch}/{epochs} | batches={num_batches} samples={num_samples}/{train_samples} | train_loss={avg_loss:.4f}")
 
 	# 5) Evaluation
 	model.eval()
