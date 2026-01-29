@@ -219,18 +219,19 @@ def train_and_eval(
         evaluator = ModelEvaluator(model, dev_dl, criterion=loss_fn, device=device)
         val_metrics = evaluator.evaluate()
         val_acc = val_metrics.get('accuracy', 0.0)
+        val_mcc = val_metrics.get('mcc', 0.0)
         val_loss = val_metrics.get('average_loss', 0.0)
 
         console.info(
-            f"Epoch {epoch}/{epochs} | train_loss={avg_loss:.4f} | val_loss={val_loss:.4f} | val_acc={val_acc:.4f}"
+            f"Epoch {epoch}/{epochs} | train_loss={avg_loss:.4f} | val_loss={val_loss:.4f} | val_acc={val_acc:.4f} | val_mcc={val_mcc:.4f}"
         )
 
-        # Early stopping on accuracy (could switch to MCC if available)
-        if val_acc > best_mcc:
-            best_mcc = val_acc
+        # Early stopping on MCC (default CoLA metric)
+        if val_mcc > best_mcc:
+            best_mcc = val_mcc
             patience_counter = 0
             best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-            console.info(f"  *** New best Accuracy: {best_mcc:.4f} ***")
+            console.info(f"  *** New best MCC: {best_mcc:.4f} ***")
         else:
             patience_counter += 1
             console.info(f"  No improvement. Patience: {patience_counter}/{patience}")
