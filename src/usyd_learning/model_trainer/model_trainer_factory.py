@@ -29,6 +29,9 @@ class ModelTrainerFactory:
             case "imdb":
                 from .trainer._model_trainer_imdb import ModelTrainer_Imdb
                 return ModelTrainer_Imdb(args)
+            case "glue":
+                from .trainer._model_trainer_glue import ModelTrainer_GLUE
+                return ModelTrainer_GLUE(args)
             case "sl_client":
                 from .trainer._model_trainer_sl_client import ModelTrainer_SlClient
                 return ModelTrainer_SlClient(args)
