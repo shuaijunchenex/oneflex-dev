@@ -143,12 +143,13 @@ def train_and_eval(
 	from usyd_learning.ml_data_loader.dataset_loader_util import DatasetLoaderUtil
 
 	# AG News format: (label, text); labels in [1,4] -> map to [0,3]
+	# AG_NEWS yields integer labels in [1, 4]; normalize to [0, 3] so CrossEntropyLoss works
 	collate_fn = lambda batch: DatasetLoaderUtil.text_collate_fn_hf(
 		batch,
 		hf_tokenizer=hf_tok,
 		max_len=max_len,
 		label_map={1: 0, 2: 1, 3: 2, 4: 3},
-		normalize_int_labels=False,
+		normalize_int_labels=True,
 		tuple_format="auto",
 		require_labels=True
 	)
