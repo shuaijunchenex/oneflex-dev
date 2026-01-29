@@ -20,8 +20,8 @@ class NNModel_TransformerClassification(NNModel):
         super().create_model(args)
         from transformers import AutoModelForSequenceClassification, AutoConfig
 
-        model_name = getattr(args, "pretrained_model", "bert-base-uncased")
-        num_labels = getattr(args, "num_classes", 2)
+        model_name = args.get("pretrained_model", "bert-base-uncased")
+        num_labels = args.get("num_classes", 2)
 
         # Prefer offline models placed under ml_models/hf_models/<model_name>. If not present, download into that folder.
         base_dir = Path(__file__).resolve().parents[2]
@@ -53,7 +53,7 @@ class NNModel_TransformerClassification(NNModel):
         self.pad_id = getattr(self.model.config, "pad_token_id", None)
         # fallback to args if config missing
         if self.pad_id is None:
-            self.pad_id = getattr(args, "pad_id", 0)
+            self.pad_id = args.get("pad_id", 0)
 
         return self
 

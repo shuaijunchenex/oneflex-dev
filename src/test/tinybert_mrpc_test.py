@@ -185,7 +185,7 @@ def train_and_eval(
 
 	# 4) Manual training loop with validation and early stopping
 	console.info(
-		f"Training TinyBERT on MRPC for {epochs} epochs | lr={lr} wd={weight_decay} warmup={warmup_ratio} bs={batch_size} device={device}"
+		f"Training RoBERTa on MRPC for {epochs} epochs | lr={lr} wd={weight_decay} warmup={warmup_ratio} bs={batch_size} device={device}"
 	)
 	
 	# Early stopping parameters - use F1 for MRPC
