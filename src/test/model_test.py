@@ -137,7 +137,8 @@ def train_and_eval(
 	
 	# Convert IterDataPipe to list for reusable dataset
 	train_dataset_list = list(train_dl.dataset) if hasattr(train_dl, 'dataset') else list(train_dl)
-	console.info(f"Loaded {len(train_dataset_list)} training samples from SST2")
+	dev_dataset_list = list(dev_dl.dataset) if hasattr(dev_dl, 'dataset') else list(dev_dl)
+	console.info(f"Loaded {len(train_dataset_list)} training samples and {len(dev_dataset_list)} dev samples from SST2")
 	
 	# Recreate DataLoader with list-based dataset and proper collate_fn
 	from torch.utils.data import DataLoader
@@ -159,6 +160,14 @@ def train_and_eval(
 		train_dataset_list,
 		batch_size=batch_size,
 		shuffle=True,
+		num_workers=0,
+		collate_fn=collate_fn
+	)
+	
+	dev_dl = DataLoader(
+		dev_dataset_list,
+		batch_size=batch_size,
+		shuffle=False,
 		num_workers=0,
 		collate_fn=collate_fn
 	)
