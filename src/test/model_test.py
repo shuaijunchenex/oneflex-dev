@@ -139,14 +139,28 @@ def train_and_eval(
 	train_dataset_list = list(train_dl.dataset) if hasattr(train_dl, 'dataset') else list(train_dl)
 	console.info(f"Loaded {len(train_dataset_list)} training samples from SST2")
 	
-	# Recreate DataLoader with list-based dataset (collate_fn preserved)
+	# Recreate DataLoader with list-based dataset and proper collate_fn
 	from torch.utils.data import DataLoader
+	from usyd_learning.ml_data_loader.dataset_loader_util import DatasetLoaderUtil
+	
+	# SST-2 returns (text, label) tuples where label is already an integer (0 or 1)
+	# No label_map needed since labels are already numeric
+	collate_fn = lambda batch: DatasetLoaderUtil.text_collate_fn_hf(
+		batch,
+		hf_tokenizer=hf_tok,
+		max_len=max_len,
+		label_map=None,
+		normalize_int_labels=False,
+		tuple_format="text_label",  # SST-2 format: (text, label)
+		require_labels=True
+	)
+	
 	train_dl = DataLoader(
 		train_dataset_list,
 		batch_size=batch_size,
 		shuffle=True,
 		num_workers=0,
-		collate_fn=getattr(sst2_loader.data_loader, 'collate_fn', None)
+		collate_fn=collate_fn
 	)
 
 	# 3) Model / Optimizer / Loss / Scheduler

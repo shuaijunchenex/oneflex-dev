@@ -164,7 +164,7 @@ class DatasetLoaderUtil:
         label_map: Optional[Dict[Any, int]] = None,
         normalize_int_labels: bool = False,
         # --- tuple format handling ---
-        tuple_format: str = "auto",  # "auto" | "label_text" | "idx_label_text"
+        tuple_format: str = "auto",  # "auto" | "label_text" | "text_label" | "idx_label_text"
         require_labels: bool = True,
     ):
         """
@@ -197,7 +197,15 @@ class DatasetLoaderUtil:
                     text = sample[-1]
                     return label, "" if text is None else str(text)
 
-                # "label_text"
+                if fmt == "text_label":
+                    # SST-2 format: (text, label)
+                    if n < 2:
+                        return None, str(sample[0]) if n == 1 else ""
+                    text = sample[0]
+                    label = sample[-1]
+                    return label, "" if text is None else str(text)
+
+                # "label_text" (default)
                 if n < 2:
                     return None, str(sample[0]) if n == 1 else ""
                 label = sample[0]
