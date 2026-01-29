@@ -1,12 +1,12 @@
 """
-Standalone CoLA classification test (non-federated) using TinyBERT.
+Standalone SST-2 classification test (non-federated) using TinyBERT.
 
 Pipeline:
 1) Build HF tokenizer (bert-base-uncased) via TokenizerBuilder.
-2) Load CoLA with HF collate into train/test DataLoaders.
+2) Load SST2 with HF collate into train/test DataLoaders.
 3) Create TinyBERT classifier (prajjwal1/bert-tiny) via NNModelFactory.
 4) Train with AdamW and CrossEntropyLoss for a few epochs.
-5) Evaluate on CoLA dev set and print metrics.
+5) Evaluate on SST2 dev set and print metrics.
 """
 
 from __future__ import annotations
@@ -48,7 +48,8 @@ def build_dataloaders(hf_tokenizer, batch_size: int, max_len: int):
 
 	dl_cfg = {
 		"data_loader": {
-			"name": "cola",
+			"name": "sst2",
+			"label_map": {"neg": 0, "pos": 1},
 			"root": dataset_root,
 			"batch_size": batch_size,
 			"test_batch_size": batch_size,
@@ -130,13 +131,13 @@ def train_and_eval(
 	}
 	hf_tok, pad_id = build_tokenizer(tokenizer_cfg)
 
-	# 2) Data - CRITICAL: torchtext CoLA returns IterDataPipe which exhausts after 1 iteration
+	# 2) Data - CRITICAL: torchtext SST2 returns IterDataPipe which exhausts after 1 iteration
 	# Convert to list to enable multi-epoch training
-	train_dl, dev_dl, cola_loader = build_dataloaders(hf_tok, batch_size, max_len)
+	train_dl, dev_dl, sst2_loader = build_dataloaders(hf_tok, batch_size, max_len)
 	
 	# Convert IterDataPipe to list for reusable dataset
 	train_dataset_list = list(train_dl.dataset) if hasattr(train_dl, 'dataset') else list(train_dl)
-	console.info(f"Loaded {len(train_dataset_list)} training samples from CoLA")
+	console.info(f"Loaded {len(train_dataset_list)} training samples from SST2")
 	
 	# Recreate DataLoader with list-based dataset (collate_fn preserved)
 	from torch.utils.data import DataLoader
@@ -145,7 +146,7 @@ def train_and_eval(
 		batch_size=batch_size,
 		shuffle=True,
 		num_workers=0,
-		collate_fn=getattr(cola_loader.data_loader, 'collate_fn', None)
+		collate_fn=getattr(sst2_loader.data_loader, 'collate_fn', None)
 	)
 
 	# 3) Model / Optimizer / Loss / Scheduler
@@ -164,7 +165,7 @@ def train_and_eval(
 
 	# 4) Manual training loop with validation and early stopping
 	console.info(
-		f"Training TinyBERT on CoLA for {epochs} epochs | lr={lr} wd={weight_decay} warmup={warmup_ratio} bs={batch_size} device={device}"
+		f"Training TinyBERT on SST2 for {epochs} epochs | lr={lr} wd={weight_decay} warmup={warmup_ratio} bs={batch_size} device={device}"
 	)
 	
 	# Early stopping parameters
@@ -251,6 +252,6 @@ def train_and_eval(
 
 if __name__ == "__main__":
 	# 使用默认参数：epochs=60, lr=5e-5, batch_size=64, warmup_ratio=0.1
-	metrics = train_and_eval()
+	metrics = train_and_eval(epochs=50, batch_size=64)
 	# 或者自定义参数，例如：
 	# metrics = train_and_eval(epochs=30, lr=3e-5, batch_size=32)
