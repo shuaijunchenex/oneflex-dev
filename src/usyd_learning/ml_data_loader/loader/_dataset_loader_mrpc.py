@@ -21,7 +21,9 @@ class DatasetLoader_MRPC(DatasetLoader):
     def _warmup_download(self, root: str, splits: tuple[str, ...]):
         for sp in splits:
             try:
-                it = iter(MRPC(root=root, split=sp))
+                # map common aliases to supported splits
+                use_sp = "test" if sp in ("valid", "validation", "dev", "valid_matched", "valid_mismatched") else sp
+                it = iter(MRPC(root=root, split=use_sp))
                 next(it)
             except StopIteration:
                 continue
@@ -37,7 +39,10 @@ class DatasetLoader_MRPC(DatasetLoader):
         shuffle = getattr(args, "shuffle", True)
         num_workers = getattr(args, "num_workers", 0)
         train_split = getattr(args, "train_split", "train")
-        test_split = getattr(args, "test_split", "valid")
+        test_split = getattr(args, "test_split", "test")
+        # map common aliases to torchtext MRPC-supported splits ('train', 'test')
+        if test_split in ("valid", "validation", "dev"):
+            test_split = "test"
         combine_fn = getattr(args, "text_pair_combine_fn", None)
 
         if is_download:

@@ -88,6 +88,9 @@ class DatasetLoaderFactory:
             case "mnli":
                 from .loader._dataset_loader_mnli import DatasetLoader_MNLI
                 return DatasetLoader_MNLI().create(data_loader_args, fn)
+            case "qqp":
+                from .loader._dataset_loader_qqp import DatasetLoader_QQP
+                return DatasetLoader_QQP().create(data_loader_args, fn)
             case "cola":
                 from .loader._dataset_loader_cola import DatasetLoader_CoLA
                 return DatasetLoader_CoLA().create(data_loader_args, fn)
