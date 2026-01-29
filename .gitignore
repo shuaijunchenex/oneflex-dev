@@ -143,6 +143,8 @@ env.bak/
 venv.bak/
 .dataset
 /**/.log/
+# HuggingFace cached weights
+src/usyd_learning/ml_models/hf_models/
 
 # Spyder project settings
 .spyderproject
