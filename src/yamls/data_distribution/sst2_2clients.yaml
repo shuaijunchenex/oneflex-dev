@@ -1,0 +1,15 @@
+#-----------------------------
+# Data distribution section (SST-2 non-iid, 2 clients)
+# Each client is skewed to one sentiment class
+#-----------------------------
+data_distribution:
+
+  # Use custom distribution
+  use: custom
+
+  # Each row -> client, each column -> class id (0: negative, 1: positive)
+  custom_define:
+    custom: [
+      [35000, 0],   # Client 1: mostly negative
+      [0, 35000]    # Client 2: mostly positive
+    ]

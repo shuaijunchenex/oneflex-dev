@@ -1,0 +1,15 @@
+#-----------------------------
+# Data distribution section (QQP non-iid, 2 clients)
+# Each client is skewed to one class (duplicate vs non-duplicate)
+#-----------------------------
+data_distribution:
+
+  # Use custom distribution
+  use: custom
+
+  # Each row -> client, each column -> class id (0: not duplicate, 1: duplicate)
+  custom_define:
+    custom: [
+      [200000, 0],   # Client 1: mostly class 0
+      [0, 200000]    # Client 2: mostly class 1
+    ]
