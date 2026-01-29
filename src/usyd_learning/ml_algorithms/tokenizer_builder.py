@@ -120,14 +120,22 @@ class TokenizerBuilder(Handlers):
                 text = _extract_text(sample)
                 yield tokenizer(text)
 
-        vocab = build_vocab_from_iterator(
-            yield_tokens(),
-            min_freq=min_freq,
-            specials=specials,
-            max_tokens=max_vocab
-        )
-        
-        vocab.set_default_index(vocab[UNK])
+        # Build Vocab from counter for compatibility across torchtext versions
+        cutoff = max_vocab - len(specials)
+        try:
+            vocab = Vocab(counter, min_freq=min_freq, specials=specials, max_size=cutoff)
+        except TypeError:
+            # Older/newer torchtext versions may use different arg names
+            vocab = Vocab(counter, min_freq=min_freq, specials=specials)
+
+        try:
+            vocab.set_default_index(vocab[UNK])
+        except Exception:
+            # fallback: set default to index of UNK if available
+            try:
+                vocab.set_default_index(vocab.get_index(UNK))
+            except Exception:
+                pass
 
         return vocab
 

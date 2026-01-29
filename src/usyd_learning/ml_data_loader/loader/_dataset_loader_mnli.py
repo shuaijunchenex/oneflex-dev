@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from functools import partial
 from torch.utils.data import DataLoader
 from datasets import load_dataset
 
 from ..dataset_loader import DatasetLoader
 from ..dataset_loader_args import DatasetLoaderArgs
+from ..dataset_loader_util import DatasetLoaderUtil
 
 """
 Dataset loader for MNLI (GLUE)
@@ -40,7 +42,7 @@ class DatasetLoader_MNLI(DatasetLoader):
         # load_dataset will download/cache data when called
         dataset = load_dataset("glue", "mnli", cache_dir=root) if is_download else load_dataset("glue", "mnli")
 
-        # materialize as list of (premise, hypothesis, label) tuples
+        # materialize hf splits
         try:
             hf_train = dataset[hf_train_split]
         except Exception:
@@ -51,34 +53,79 @@ class DatasetLoader_MNLI(DatasetLoader):
         except Exception:
             hf_test = dataset.get("validation_matched", [])
 
-        def _to_tuple_list(hf_ds):
+        tokenizer = getattr(args, "tokenizer", None)
+        use_hf = tokenizer is not None and (
+            hasattr(tokenizer, "vocab_size") or hasattr(tokenizer, "pad_token_id") or hasattr(tokenizer, "__call__")
+        )
+
+        def _to_merged_list(hf_ds):
             if hf_ds is None:
                 return []
             out = []
             for item in hf_ds:
-                # HF datasets return dict with 'premise','hypothesis','label'
-                prem = item.get("premise") or item.get("sentence1") or item.get("sentence1", "")
-                hyp = item.get("hypothesis") or item.get("sentence2") or item.get("sentence2", "")
+                prem = item.get("premise") or item.get("sentence1") or ""
+                hyp = item.get("hypothesis") or item.get("sentence2") or ""
                 lab = item.get("label")
-                out.append((prem, hyp, lab))
+                out.append({"label": lab, "text": f"{prem} [SEP] {hyp}"})
             return out
 
-        self._dataset = _to_tuple_list(hf_train)
-        self._test_dataset = _to_tuple_list(hf_test)
+        if use_hf:
+            # Use HF tokenizer path: merge pairs to single text and use HF collate
+            self._dataset = _to_merged_list(hf_train)
+            self._test_dataset = _to_merged_list(hf_test)
 
-        self._data_loader = DataLoader(
-            self._dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-        )
+            args.vocab_size = getattr(tokenizer, "vocab_size", None)
 
-        self._test_data_loader = DataLoader(
-            self._test_dataset,
-            batch_size=test_batch_size,
-            shuffle=False,
-            num_workers=num_workers,
-        )
+            collate = partial(
+                DatasetLoaderUtil.text_collate_fn_hf,
+                hf_tokenizer=tokenizer,
+                max_len=getattr(args, "max_len", 256),
+            )
+
+            self._data_loader = DataLoader(
+                self._dataset,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                num_workers=num_workers,
+                collate_fn=collate,
+            )
+
+            self._test_data_loader = DataLoader(
+                self._test_dataset,
+                batch_size=test_batch_size,
+                shuffle=False,
+                num_workers=num_workers,
+                collate_fn=collate,
+            )
+        else:
+            # Fallback: expose tuples (premise, hypothesis, label) as before
+            def _to_tuple_list(hf_ds):
+                if hf_ds is None:
+                    return []
+                out = []
+                for item in hf_ds:
+                    prem = item.get("premise") or item.get("sentence1") or ""
+                    hyp = item.get("hypothesis") or item.get("sentence2") or ""
+                    lab = item.get("label")
+                    out.append((prem, hyp, lab))
+                return out
+
+            self._dataset = _to_tuple_list(hf_train)
+            self._test_dataset = _to_tuple_list(hf_test)
+
+            self._data_loader = DataLoader(
+                self._dataset,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                num_workers=num_workers,
+            )
+
+            self._test_data_loader = DataLoader(
+                self._test_dataset,
+                batch_size=test_batch_size,
+                shuffle=False,
+                num_workers=num_workers,
+            )
 
         self.task_type = "nlp"
         try:

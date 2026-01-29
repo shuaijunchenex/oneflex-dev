@@ -48,30 +48,82 @@ class DatasetLoader_MRPC(DatasetLoader):
         if is_download:
             self._warmup_download(root, (train_split, test_split))
 
-        self._dataset = MRPC(root=root, split=train_split)
-        self._test_dataset = MRPC(root=root, split=test_split)
-
-        tokenizer = getattr(args, "tokenizer")
-        self.vocab = getattr(args, "vocab", None)
-        if self.vocab is None:
-            self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
-            
-        args.vocab_size = len(self.vocab)
-
-        collate = partial(
-            DatasetLoaderUtil.text_pair_collate_fn,
-            tokenizer=tokenizer,
-            vocab=self.vocab,
-            combine_fn=combine_fn,
+        # Default: use torchtext MRPC dataset (iterable)
+        tokenizer = getattr(args, "tokenizer", None)
+        use_hf = tokenizer is not None and (
+            hasattr(tokenizer, "vocab_size") or hasattr(tokenizer, "pad_token_id") or hasattr(tokenizer, "__call__")
         )
 
-        self._data_loader = DataLoader(
-            self._dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            collate_fn=collate,
-        )
+        if use_hf:
+            # Materialize and merge sentence pairs into single text like QQP/SST2 approach
+            raw_train = MRPC(root=root, split=train_split)
+            raw_test = MRPC(root=root, split=test_split)
+
+            def _merge(item, idx):
+                # MRPC items can be tuple/list or dict
+                if isinstance(item, dict):
+                    s1 = item.get("sentence1") or item.get("text_a") or ""
+                    s2 = item.get("sentence2") or item.get("text_b") or ""
+                    lab = item.get("label")
+                else:
+                    # tuple/list: assume (label, sent1, sent2) or (label, sent1, sent2, idx)
+                    if len(item) >= 3:
+                        lab = item[0]
+                        s1 = item[1]
+                        s2 = item[2]
+                    else:
+                        lab = None
+                        s1 = ""
+                        s2 = ""
+                text = f"{s1} [SEP] {s2}"
+                return {"label": lab, "text": text}
+
+            train_list = list(raw_train)
+            test_list = list(raw_test)
+            self._dataset = [_merge(it, i) for i, it in enumerate(train_list)]
+            self._test_dataset = [_merge(it, i) for i, it in enumerate(test_list)]
+
+            args.vocab_size = getattr(tokenizer, "vocab_size", None)
+
+            collate = partial(
+                DatasetLoaderUtil.text_collate_fn_hf,
+                hf_tokenizer=tokenizer,
+                max_len=getattr(args, "max_len", 256),
+            )
+
+            self._data_loader = DataLoader(
+                self._dataset,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                num_workers=num_workers,
+                collate_fn=collate,
+            )
+
+        else:
+            # Legacy path using TokenizerBuilder and vocab
+            self._dataset = MRPC(root=root, split=train_split)
+            self._test_dataset = MRPC(root=root, split=test_split)
+
+            self.vocab = getattr(args, "vocab", None)
+            if self.vocab is None:
+                self.vocab = TokenizerBuilder.build_vocab(self._dataset, tokenizer)
+
+            args.vocab_size = len(self.vocab)
+
+            collate = partial(
+                DatasetLoaderUtil.text_pair_collate_fn,
+                tokenizer=tokenizer,
+                vocab=self.vocab,
+                combine_fn=combine_fn,
+            )
+
+            self._data_loader = DataLoader(
+                self._dataset,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                num_workers=num_workers,
+                collate_fn=collate,
+            )
 
         self.task_type = "nlp"
         try:
