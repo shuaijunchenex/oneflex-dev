@@ -1,10 +1,10 @@
 """
-Standalone MRPC (Microsoft Research Paraphrase Corpus) classification test using TinyBERT.
+Standalone MRPC (Microsoft Research Paraphrase Corpus) classification test using RoBERTa-base.
 
 Pipeline:
-1) Build HF tokenizer (bert-base-uncased) via TokenizerBuilder.
+1) Build HF tokenizer (roberta-base) via TokenizerBuilder.
 2) Load MRPC with HF collate into train/test DataLoaders.
-3) Create TinyBERT classifier (prajjwal1/bert-tiny) via NNModelFactory.
+3) Create RoBERTa-base classifier via NNModelFactory.
 4) Train with AdamW and CrossEntropyLoss for a few epochs.
 5) Evaluate on MRPC dev set and print metrics.
 
@@ -73,8 +73,8 @@ def build_dataloaders(hf_tokenizer, batch_size: int, max_len: int):
 def build_model(pad_id: int, num_classes: int = 2):
 	model_cfg = {
 		"nn_model": {
-			"name": "tiny_bert",
-			"pretrained_model": "prajjwal1/bert-tiny",
+			"name": "transformer_classification",
+			"pretrained_model": "distilroberta-base",
 			"num_classes": num_classes,
 			"pad_id": pad_id,
 		}
@@ -123,7 +123,7 @@ def train_and_eval(
 		"tokenizer": {
 			"type": "bert",
 			"use_hf_tokenizer": True,
-			"pretrained": "bert-base-uncased",
+			"pretrained": "roberta-base",
 			"use_fast": True,
 			"return_type": "tokens",
 			"max_len": max_len,

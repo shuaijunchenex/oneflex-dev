@@ -50,6 +50,7 @@ yaml_folder_nn_model_files:
 - transformer_encode_decoder.yaml: transformer_encode_decoder
 - transformer_hybrid.yaml: transformer_hybrid
 - transformer_tiny_scratch.yaml: transformer_tiny_scratch
+- transformer_roberta_base.yaml: transformer_roberta_base
 
 yaml_folder_lora_inference_files:
 - base_lora_inference.yaml: base_lora_inference_mode
@@ -115,7 +116,7 @@ yaml_combination:
   - role_client
   - training_logger
   - dataset_loader_cola
-  - transformer_tinybert
+  - transformer_roberta_base
   - cross_entropy
   - adamw
   - training_epoch3
@@ -131,7 +132,7 @@ yaml_combination:
   - general_round100
   - training_logger
   - dataset_loader_cola
-  - transformer_tinybert
+  - transformer_roberta_base
   - cross_entropy
   - adamw
   - training_epoch3
